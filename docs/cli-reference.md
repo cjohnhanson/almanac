@@ -28,9 +28,10 @@ Print a machine-readable JSON index of all available skills.
 
 Browse bundled almanac documentation.
 
-    almanac docs                    List available docs
-    almanac docs <topic>            Print a doc
-    almanac docs search <query>     Search across docs
+    almanac docs                    List available docs (shows slugs)
+    almanac docs list               Same as bare `almanac docs`
+    almanac docs <identifier>       Print a doc by slug, title, or unique prefix
+    almanac docs search <query>     Search across all docs
 
 ## Options
 
