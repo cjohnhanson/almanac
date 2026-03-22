@@ -2,6 +2,7 @@ use std::path::Path;
 
 use clap::Parser;
 
+use crate::docs;
 use crate::error::Error;
 use crate::skill;
 use crate::source::SkillSource;
@@ -45,6 +46,13 @@ pub enum Command {
         #[arg(long = "source", short = 's')]
         sources: Vec<String>,
     },
+    /// Browse bundled documentation.
+    Docs {
+        /// Topic slug to display, or "search" to search.
+        topic: Option<String>,
+        /// Search query (when topic is "search").
+        query: Option<String>,
+    },
 }
 
 /// Run a CLI command (used when almanac is mounted as a subcommand by clc).
@@ -79,6 +87,7 @@ pub fn run_command(
             cmd_index(root, &all_sources);
             Ok(())
         }
+        Command::Docs { topic, query } => cmd_docs(topic.as_deref(), query.as_deref()),
     }
 }
 
@@ -107,6 +116,35 @@ fn cmd_list(root: &Path, sources: &[SkillSource]) {
 fn cmd_index(root: &Path, sources: &[SkillSource]) {
     let entries = skill::index(root, sources);
     println!("{}", skill::format_index_json(&entries));
+}
+
+fn cmd_docs(topic: Option<&str>, query: Option<&str>) -> Result<(), Error> {
+    match topic {
+        None => {
+            docs::list();
+            Ok(())
+        }
+        Some("search") => {
+            let q = query.unwrap_or("");
+            if q.is_empty() {
+                return Err(Error::General(
+                    "usage: almanac docs search <query>".to_string(),
+                ));
+            }
+            docs::search(q);
+            Ok(())
+        }
+        Some(slug) => {
+            if docs::show(slug) {
+                Ok(())
+            } else {
+                eprintln!("unknown doc: {slug}");
+                eprintln!();
+                docs::list();
+                Err(Error::General(format!("doc '{slug}' not found")))
+            }
+        }
+    }
 }
 
 /// Merge config-provided sources with CLI --source flags.

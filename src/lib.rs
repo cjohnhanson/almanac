@@ -1,4 +1,5 @@
 pub mod cli;
+pub mod docs;
 pub mod error;
 pub mod skill;
 pub mod source;

@@ -174,8 +174,18 @@ fn parse_skill_md(skill_md: &Path, skill_dir: &Path) -> Result<SkillEntry, Error
         .and_then(|n| n.to_str())
         .unwrap_or("unknown");
 
+    let name = parsed.name.unwrap_or_else(|| dir_name.to_string());
+
+    // Warn if name doesn't match directory name per agentskills.io spec.
+    if name != dir_name {
+        eprintln!(
+            "warning: skill name '{name}' does not match directory '{dir_name}' in {}",
+            skill_md.display()
+        );
+    }
+
     Ok(SkillEntry {
-        name: parsed.name.unwrap_or_else(|| dir_name.to_string()),
+        name,
         description: parsed.description.unwrap_or_default(),
         source: SkillLocation::File(skill_md.to_string_lossy().into_owned()),
     })
