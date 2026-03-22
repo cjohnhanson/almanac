@@ -120,8 +120,8 @@ fn cmd_index(root: &Path, sources: &[SkillSource]) {
 
 fn cmd_docs(topic: Option<&str>, query: Option<&str>) -> Result<(), Error> {
     match topic {
-        None => {
-            docs::list();
+        None | Some("list") => {
+            print!("{}", docs::format_list(docs::PAGES));
             Ok(())
         }
         Some("search") => {
@@ -131,17 +131,23 @@ fn cmd_docs(topic: Option<&str>, query: Option<&str>) -> Result<(), Error> {
                     "usage: almanac docs search <query>".to_string(),
                 ));
             }
-            docs::search(q);
+            let matches = docs::find_matching(docs::PAGES, q);
+            if matches.is_empty() {
+                eprintln!("no docs matching '{q}'");
+            } else {
+                print!("{}", docs::format_list_from_refs(&matches));
+            }
             Ok(())
         }
-        Some(slug) => {
-            if docs::show(slug) {
+        Some(identifier) => {
+            if let Some(page) = docs::find(identifier) {
+                print!("{}", page.content());
                 Ok(())
             } else {
-                eprintln!("unknown doc: {slug}");
+                eprintln!("unknown doc: {identifier}");
                 eprintln!();
-                docs::list();
-                Err(Error::General(format!("doc '{slug}' not found")))
+                print!("{}", docs::format_list(docs::PAGES));
+                Err(Error::General(format!("doc '{identifier}' not found")))
             }
         }
     }
