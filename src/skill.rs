@@ -37,8 +37,99 @@ struct BuiltInSkill {
     content: &'static str,
 }
 
-/// All built-in skills. Content will be added as skills are authored.
-const BUILTIN_SKILLS: &[BuiltInSkill] = &[];
+/// All built-in skills, baked into the binary at compile time.
+const BUILTIN_SKILLS: &[BuiltInSkill] = &[
+    BuiltInSkill {
+        name: "api-design-eval",
+        description: "API design evaluation using Richardson REST maturity model, Google/Zalando/Microsoft guidelines, JSON:API patterns, and developer experience heuristics.",
+        content: include_str!("../../skills/api-design-eval/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "architecture-eval",
+        description: "Architecture evaluation using ATAM quality attribute scenarios, ISO 25010 quality characteristics, coupling/cohesion analysis, SOLID at the system level, Conway's Law alignment, C4 model, ADR review, and technical debt assessment.",
+        content: include_str!("../../skills/architecture-eval/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "code-review-eval",
+        description: "Structured code review using Fagan inspection passes, Google's priority hierarchy, SOLID principles, Fowler's code smells, and cognitive complexity.",
+        content: include_str!("../../skills/code-review-eval/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "debugging",
+        description: "Structured debugging using scientific method, 5 Whys, Ishikawa fishbone diagrams, fault tree analysis, delta debugging, wolf fence bisection, Kepner-Tregoe IS/IS NOT analysis, and blameless incident investigation.",
+        content: include_str!("../../skills/debugging/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "design-review",
+        description: "Systematic design evaluation for web UIs using Nielsen's heuristics, Gestalt principles, and cognitive walkthrough.",
+        content: include_str!("../../skills/design-review/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "performance-eval",
+        description: "Web performance evaluation using RAIL model, Core Web Vitals (LCP, INP, CLS), performance budgets, critical rendering path analysis, Lighthouse scoring, and anti-pattern detection.",
+        content: include_str!("../../skills/performance-eval/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "playwright-missouri",
+        description: "Writing missouri tests that need browser interaction \u{2014} testing web UIs, verifying rendered state, or automating browser workflows as part of state graph transitions.",
+        content: include_str!("../../skills/playwright-missouri/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "qa-cli",
+        description: "Exploratory QA for CLI tools. Enumerates testable areas via SFDPOT heuristics adapted for command-line interfaces, dispatches sub-agents as independent checkers, evaluates results against consistency oracles.",
+        content: include_str!("../../skills/qa-cli/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "qa-web",
+        description: "Exploratory QA for web UIs using agent-browser. Enumerates testable areas via SFDPOT heuristics, dispatches sub-agents as independent checkers, evaluates results against consistency oracles (FEW HICCUPPS), runs fresh-eyes sessions.",
+        content: include_str!("../../skills/qa-web/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "research",
+        description: "Structured research using Cynefin classification, PRISMA-style search accountability, Zettelkasten note processing, grounded theory coding, ACH for competing hypotheses, and source triangulation.",
+        content: include_str!("../../skills/research/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "security-review",
+        description: "Security evaluation using OWASP Top 10, STRIDE threat modeling, DREAD risk rating, and a structured review checklist covering input validation, auth, session management, cryptography, error handling, logging, data protection, and dependencies.",
+        content: include_str!("../../skills/security-review/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "structured-thinking",
+        description: "Structured thinking and communication using Minto Pyramid (SCQA), BLUF, MECE issue trees, Six Thinking Hats, first principles, steel manning, OODA loop, and Socratic questioning.",
+        content: include_str!("../../skills/structured-thinking/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "testing-strategy",
+        description: "Test strategy design using shape models (pyramid, trophy, diamond), Marick's testing quadrants, risk-based prioritization, RCRCRC regression selection, Beck's 12 test desiderata, Google's test size classification, and specialized techniques (contract, property-based, mutation testing).",
+        content: include_str!("../../skills/testing-strategy/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "tisket-writing",
+        description: "Write well-scoped tisket issues using INVEST criteria, problem-first framing, testable acceptance criteria, and vertical slicing for decomposition.",
+        content: include_str!("../../skills/tisket-writing/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "writing-docs-eval",
+        description: "Documentation-specific evaluation using IBM DQTI nine characteristics, Di\u{00e1}taxis per-type quality criteria, and Baker's Every Page is Page One principles.",
+        content: include_str!("../../skills/writing-docs-eval/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "writing-review",
+        description: "Orchestrates writing evaluation by classifying content and dispatching the appropriate framework skills. Runs sentence-level checks, docs evaluation, readability metrics, voice consistency, and fresh-eyes review.",
+        content: include_str!("../../skills/writing-review/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "writing-sentence-level",
+        description: "Sentence-level writing evaluation using Orwell's 6 rules, Williams' clarity diagnostics, readability metrics, and persuasion frameworks (AIDA/PAS).",
+        content: include_str!("../../skills/writing-sentence-level/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "zettel",
+        description: "Working with the zettel knowledge base \u{2014} searching for context, creating notes on request, doing research, or exploring the note graph.",
+        content: include_str!("../../skills/zettel/SKILL.md"),
+    },
+];
 
 /// Scan all configured skill sources and return an index of available skills.
 pub fn index(project_dir: &Path, sources: &[SkillSource]) -> Vec<SkillEntry> {
@@ -327,8 +418,9 @@ mod tests {
         }];
 
         let entries = index(dir.path(), &sources);
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].name, "my-skill");
+        let file_entries: Vec<_> = entries.iter().filter(|e| e.source != SkillLocation::BuiltIn).collect();
+        assert_eq!(file_entries.len(), 1);
+        assert_eq!(file_entries[0].name, "my-skill");
     }
 
     #[test]
@@ -347,15 +439,17 @@ mod tests {
         }];
 
         let entries = index(dir.path(), &sources);
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].name, "local-skill");
+        let file_entries: Vec<_> = entries.iter().filter(|e| e.source != SkillLocation::BuiltIn).collect();
+        assert_eq!(file_entries.len(), 1);
+        assert_eq!(file_entries[0].name, "local-skill");
     }
 
     #[test]
     fn index_empty_sources_returns_only_builtins() {
         let dir = tempfile::tempdir().unwrap();
         let entries = index(dir.path(), &[]);
-        assert!(entries.is_empty());
+        assert_eq!(entries.len(), BUILTIN_SKILLS.len());
+        assert!(entries.iter().all(|e| e.source == SkillLocation::BuiltIn));
     }
 
     #[test]
@@ -365,7 +459,7 @@ mod tests {
             path: "/nonexistent/skills/".into(),
         }];
         let entries = index(dir.path(), &sources);
-        assert!(entries.is_empty());
+        assert_eq!(entries.len(), BUILTIN_SKILLS.len());
     }
 
     #[test]
