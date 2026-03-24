@@ -1,0 +1,5 @@
+setup:
+  - name: "build almanac"
+    command: "cargo build --quiet --manifest-path ../../../Cargo.toml -p almanac"
+  - name: "link binary into project bin"
+    command: "mkdir -p .missouri/bin && ln -sf $(cd ../../.. && pwd)/target/debug/almanac .missouri/bin/almanac"

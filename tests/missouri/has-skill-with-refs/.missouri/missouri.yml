@@ -1,0 +1,33 @@
+entrypoint: true
+
+assertions:
+  - name: "show skill with references includes content"
+    command: "almanac show test-skill --source ./skills | grep -q '# Test Skill'"
+
+  - name: "show skill with references appends references section"
+    command: "almanac show test-skill --source ./skills | grep -q '## References'"
+
+  - name: "references listing includes deep-dive.md"
+    command: "almanac show test-skill --source ./skills | grep -q 'almanac show test-skill/references/deep-dive.md'"
+
+  - name: "references listing includes examples.md"
+    command: "almanac show test-skill --source ./skills | grep -q 'almanac show test-skill/references/examples.md'"
+
+  - name: "show skill without references has no listing"
+    command: "! almanac show plain-skill --source ./skills | grep -q '## References'"
+
+  - name: "show reference file returns content"
+    command: "almanac show test-skill/references/deep-dive.md --source ./skills | grep -q '# Deep Dive'"
+
+  - name: "show reference file includes body"
+    command: "almanac show test-skill/references/deep-dive.md --source ./skills | grep -q 'Content that agents load on demand'"
+
+  - name: "show nonexistent reference fails"
+    command: "almanac show test-skill/references/nonexistent.md --source ./skills"
+    should_fail: true
+
+  - name: "list shows skill with references"
+    command: "almanac list --source ./skills | grep -q 'test-skill'"
+
+  - name: "list shows plain skill"
+    command: "almanac list --source ./skills | grep -q 'plain-skill'"

@@ -1,0 +1,9 @@
+transitions:
+  - name: "create skill fixtures"
+    command: |
+      mkdir -p skills/test-skill/references skills/plain-skill
+      printf '%s\n' '---' 'name: test-skill' 'description: A test skill with references for missouri testing.' '---' '' '# Test Skill' '' 'This skill has references for progressive disclosure.' > skills/test-skill/SKILL.md
+      printf '%s\n' '# Deep Dive' '' 'Detailed framework explanation that would be too long for SKILL.md.' '' '## Section 1' '' 'Content that agents load on demand.' > skills/test-skill/references/deep-dive.md
+      printf '%s\n' '# Examples' '' 'Concrete examples for the test skill.' > skills/test-skill/references/examples.md
+      printf '%s\n' '---' 'name: plain-skill' 'description: A skill without references.' '---' '' '# Plain Skill' '' 'No references directory here.' > skills/plain-skill/SKILL.md
+    target: "../has-skill-with-refs"

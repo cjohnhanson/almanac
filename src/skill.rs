@@ -155,12 +155,38 @@ pub fn index(project_dir: &Path, sources: &[SkillSource]) -> Vec<SkillEntry> {
 }
 
 /// Print the full content of a named skill. Returns Ok(true) if found, Ok(false) if not.
+///
+/// Supports `name/references/<file>` paths for fetching individual reference files.
+/// When showing a skill (not a reference), appends a reference listing if the skill
+/// has a `references/` directory.
 pub fn show(name: &str, project_dir: &Path, sources: &[SkillSource]) -> Result<bool, Error> {
+    match show_captured(name, project_dir, sources)? {
+        Some(content) => {
+            print!("{content}");
+            Ok(true)
+        }
+        None => Ok(false),
+    }
+}
+
+/// Return the content of a named skill (or reference) as a string.
+/// Returns Ok(None) if not found.
+pub fn show_captured(
+    name: &str,
+    project_dir: &Path,
+    sources: &[SkillSource],
+) -> Result<Option<String>, Error> {
+    // Check for reference path: "skill-name/references/file.md"
+    if let Some((skill_name, ref_path)) = parse_reference_path(name) {
+        return show_reference(skill_name, ref_path, project_dir, sources);
+    }
+
     // Check built-in skills first.
     for skill in BUILTIN_SKILLS {
         if skill.name == name {
-            print!("{}", skill.content);
-            return Ok(true);
+            let mut content = skill.content.to_string();
+            append_builtin_references(name, &mut content);
+            return Ok(Some(content));
         }
     }
 
@@ -169,15 +195,124 @@ pub fn show(name: &str, project_dir: &Path, sources: &[SkillSource]) -> Result<b
     for entry in &entries {
         if entry.name == name {
             if let SkillLocation::File(path) = &entry.source {
-                let content = std::fs::read_to_string(path)
+                let mut content = std::fs::read_to_string(path)
                     .map_err(|e| Error::General(format!("failed to read {path}: {e}")))?;
-                print!("{content}");
-                return Ok(true);
+                let skill_dir = Path::new(path).parent().unwrap_or(Path::new("."));
+                append_file_references(name, skill_dir, &mut content);
+                return Ok(Some(content));
             }
         }
     }
 
-    Ok(false)
+    Ok(None)
+}
+
+/// Parse "skill-name/references/file.md" into ("skill-name", "file.md").
+fn parse_reference_path(name: &str) -> Option<(&str, &str)> {
+    let rest = name.split_once("/references/")?;
+    if rest.0.is_empty() || rest.1.is_empty() {
+        return None;
+    }
+    Some(rest)
+}
+
+/// Fetch a reference file for a file-based or built-in skill.
+fn show_reference(
+    skill_name: &str,
+    ref_file: &str,
+    project_dir: &Path,
+    sources: &[SkillSource],
+) -> Result<Option<String>, Error> {
+    // Reject path traversal.
+    if ref_file.contains("..") {
+        return Ok(None);
+    }
+
+    // Check built-in references first.
+    for skill in BUILTIN_SKILLS {
+        if skill.name == skill_name {
+            for r in builtin_references(skill_name) {
+                if r.name == ref_file {
+                    return Ok(Some(r.content.to_string()));
+                }
+            }
+            return Ok(None);
+        }
+    }
+
+    // Check file-based skills.
+    let entries = index(project_dir, sources);
+    for entry in &entries {
+        if entry.name == skill_name {
+            if let SkillLocation::File(path) = &entry.source {
+                let skill_dir = Path::new(path).parent().unwrap_or(Path::new("."));
+                let ref_path = skill_dir.join("references").join(ref_file);
+                if ref_path.is_file() {
+                    let content = std::fs::read_to_string(&ref_path).map_err(|e| {
+                        Error::General(format!("failed to read {}: {e}", ref_path.display()))
+                    })?;
+                    return Ok(Some(content));
+                }
+            }
+            return Ok(None);
+        }
+    }
+
+    Ok(None)
+}
+
+/// Append a references listing to content if the file-based skill has a references/ dir.
+fn append_file_references(skill_name: &str, skill_dir: &Path, content: &mut String) {
+    let refs_dir = skill_dir.join("references");
+    if !refs_dir.is_dir() {
+        return;
+    }
+    let mut files: Vec<String> = std::fs::read_dir(&refs_dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|e| e.path().is_file())
+        .filter_map(|e| e.file_name().to_str().map(String::from))
+        .collect();
+    if files.is_empty() {
+        return;
+    }
+    files.sort();
+    content.push_str("\n\n## References\n\nUse `almanac show <skill>/references/<file>` to load a reference.\n\n");
+    for file in &files {
+        content.push_str(&format!(
+            "  `almanac show {skill_name}/references/{file}`\n"
+        ));
+    }
+}
+
+/// Append a references listing for a built-in skill.
+fn append_builtin_references(skill_name: &str, content: &mut String) {
+    let refs = builtin_references(skill_name);
+    if refs.is_empty() {
+        return;
+    }
+    content.push_str("\n\n## References\n\nUse `almanac show <skill>/references/<file>` to load a reference.\n\n");
+    for r in &refs {
+        content.push_str(&format!(
+            "  `almanac show {skill_name}/references/{}`\n",
+            r.name
+        ));
+    }
+}
+
+/// A built-in reference file.
+struct BuiltInReference {
+    name: &'static str,
+    content: &'static str,
+}
+
+/// Return built-in references for a skill. Currently empty — populated as
+/// skills gain reference files.
+fn builtin_references(_skill_name: &str) -> Vec<BuiltInReference> {
+    // TODO: match on skill_name and return include_str!() references
+    // when skills have references/ directories.
+    vec![]
 }
 
 /// Format the skill index for injection into agent context.
@@ -560,5 +695,73 @@ mod tests {
         let project = Path::new("/home/user/project");
         let resolved = resolve_path(project, "/opt/skills/");
         assert_eq!(resolved, Path::new("/opt/skills/"));
+    }
+
+    // --- references/ support ---
+
+    fn make_skill_with_refs(dir: &Path) -> Vec<SkillSource> {
+        let skill = dir.join("skills").join("my-skill");
+        let refs = skill.join("references");
+        std::fs::create_dir_all(&refs).unwrap();
+        std::fs::write(
+            skill.join("SKILL.md"),
+            "---\nname: my-skill\ndescription: A skill with refs\n---\n\n# My Skill\n",
+        )
+        .unwrap();
+        std::fs::write(refs.join("deep-dive.md"), "# Deep Dive\n\nDetailed content.\n").unwrap();
+        std::fs::write(refs.join("examples.md"), "# Examples\n\nSome examples.\n").unwrap();
+        vec![SkillSource::Path {
+            path: dir.join("skills").to_string_lossy().into_owned(),
+        }]
+    }
+
+    #[test]
+    fn show_reference_file_returns_content() {
+        let dir = tempfile::tempdir().unwrap();
+        let sources = make_skill_with_refs(dir.path());
+        let output = show_to_string("my-skill/references/deep-dive.md", dir.path(), &sources);
+        assert!(output.contains("# Deep Dive"));
+        assert!(output.contains("Detailed content."));
+    }
+
+    #[test]
+    fn show_reference_nonexistent_returns_false() {
+        let dir = tempfile::tempdir().unwrap();
+        let sources = make_skill_with_refs(dir.path());
+        assert!(!show("my-skill/references/nonexistent.md", dir.path(), &sources).unwrap());
+    }
+
+    #[test]
+    fn show_skill_with_refs_appends_listing() {
+        let dir = tempfile::tempdir().unwrap();
+        let sources = make_skill_with_refs(dir.path());
+        let output = show_to_string("my-skill", dir.path(), &sources);
+        assert!(output.contains("# My Skill"));
+        assert!(output.contains("## References"));
+        assert!(output.contains("almanac show my-skill/references/deep-dive.md"));
+        assert!(output.contains("almanac show my-skill/references/examples.md"));
+    }
+
+    #[test]
+    fn show_skill_without_refs_no_listing() {
+        let dir = tempfile::tempdir().unwrap();
+        let skill = dir.path().join("skills").join("plain-skill");
+        std::fs::create_dir_all(&skill).unwrap();
+        std::fs::write(
+            skill.join("SKILL.md"),
+            "---\nname: plain-skill\ndescription: No refs\n---\n\n# Plain\n",
+        )
+        .unwrap();
+        let sources = vec![SkillSource::Path {
+            path: dir.path().join("skills").to_string_lossy().into_owned(),
+        }];
+        let output = show_to_string("plain-skill", dir.path(), &sources);
+        assert!(output.contains("# Plain"));
+        assert!(!output.contains("## References"));
+    }
+
+    /// Helper: capture show() output as a string instead of printing to stdout.
+    fn show_to_string(name: &str, project_dir: &Path, sources: &[SkillSource]) -> String {
+        show_captured(name, project_dir, sources).unwrap().unwrap_or_default()
     }
 }
