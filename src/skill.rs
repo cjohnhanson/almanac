@@ -189,6 +189,13 @@ pub fn format_index(entries: &[SkillEntry]) -> String {
     let mut out = String::from(
         "## Skills (almanac)\n\nAvailable skills — read the full SKILL.md when needed:\n\n",
     );
+    out.push_str(&format_index_list(entries));
+    out
+}
+
+/// Format just the skill list (no header). For callers that provide their own framing.
+pub fn format_index_list(entries: &[SkillEntry]) -> String {
+    let mut out = String::new();
     for entry in entries {
         let retrieval = match &entry.source {
             SkillLocation::File(path) => format!("file: {path}"),
