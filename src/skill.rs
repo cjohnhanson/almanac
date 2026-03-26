@@ -129,6 +129,11 @@ const BUILTIN_SKILLS: &[BuiltInSkill] = &[
         description: "Working with the zettel knowledge base \u{2014} searching for context, creating notes on request, doing research, or exploring the note graph.",
         content: include_str!("../../skills/zettel/SKILL.md"),
     },
+    BuiltInSkill {
+        name: "moose",
+        description: "Browser automation CLI for AI agents \u{2014} navigating pages, filling forms, clicking buttons, taking screenshots, recording screencasts, extracting data, testing web apps.",
+        content: include_str!("../../skills/moose/SKILL.md"),
+    },
 ];
 
 /// Scan all configured skill sources and return an index of available skills.
