@@ -6,14 +6,14 @@ type: explanation
 
 # What is Almanac?
 
-Almanac indexes agent skills from multiple sources so agents can search and load them.
-A skill is a directory containing a SKILL.md file — markdown with YAML frontmatter
-that gives an agent procedural knowledge for a specific domain or task.
+Almanac indexes agent skills from multiple sources so agents can search
+and load them. A skill is a directory with a SKILL.md file: YAML
+frontmatter declares name and description, the body holds instructions.
 
-Almanac implements the core of the agentskills.io specification: SKILL.md parsing,
-name/description frontmatter, and progressive disclosure (metadata at startup,
-full content on demand). It does not yet support the optional directory conventions
-(`scripts/`, `references/`, `assets/`) from the spec.
+Almanac implements the agentskills.io specification for SKILL.md
+parsing and frontmatter. At session start, agents see a list of skill
+names and descriptions. Full content is loaded on demand via `almanac
+show <name>`.
 
 ## Skill sources
 
@@ -28,10 +28,9 @@ Sources are configured in `clc.yml` under the `skills:` key, or passed via
 
 ## How agents use it
 
-At session start, clc injects a skill index into the agent's context —
-a flat list of skill names and descriptions. The agent decides when to load
-a skill based on the description. Full content is retrieved via `almanac show <name>`
-or by reading the SKILL.md file directly.
+clc injects the skill index into agent context at session start.
+Agents load full skill content via `almanac show <name>` or by reading
+the SKILL.md file directly.
 
 ## SKILL.md format
 
