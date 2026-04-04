@@ -6,7 +6,7 @@ type: explanation
 
 # What is Almanac?
 
-Almanac aggregates agent skills from multiple sources and makes them discoverable.
+Almanac indexes agent skills from multiple sources so agents can search and load them.
 A skill is a directory containing a SKILL.md file — markdown with YAML frontmatter
 that gives an agent procedural knowledge for a specific domain or task.
 
