@@ -40,6 +40,11 @@ struct BuiltInSkill {
 /// All built-in skills, baked into the binary at compile time.
 const BUILTIN_SKILLS: &[BuiltInSkill] = &[
     BuiltInSkill {
+        name: "anti-slop",
+        description: "Pre-generation constraints for avoiding AI-written prose patterns. Applies to all writing: docs, READMEs, commit messages, PR descriptions, comments, essays.",
+        content: include_str!("../../skills/anti-slop/SKILL.md"),
+    },
+    BuiltInSkill {
         name: "api-design-eval",
         description: "API design evaluation using Richardson REST maturity model, Google/Zalando/Microsoft guidelines, JSON:API patterns, and developer experience heuristics.",
         content: include_str!("../../skills/api-design-eval/SKILL.md"),
@@ -55,6 +60,11 @@ const BUILTIN_SKILLS: &[BuiltInSkill] = &[
         content: include_str!("../../skills/code-review-eval/SKILL.md"),
     },
     BuiltInSkill {
+        name: "continuous-improvement",
+        description: "Driver-tick loop for long-running project sessions. A scheduled prompt fires on a regular cadence, dispatches fresh-eyes reviewers across review dimensions, and applies mechanical catches inline.",
+        content: include_str!("../../skills/continuous-improvement/SKILL.md"),
+    },
+    BuiltInSkill {
         name: "debugging",
         description: "Structured debugging using scientific method, 5 Whys, Ishikawa fishbone diagrams, fault tree analysis, delta debugging, wolf fence bisection, Kepner-Tregoe IS/IS NOT analysis, and blameless incident investigation.",
         content: include_str!("../../skills/debugging/SKILL.md"),
@@ -65,6 +75,26 @@ const BUILTIN_SKILLS: &[BuiltInSkill] = &[
         content: include_str!("../../skills/design-review/SKILL.md"),
     },
     BuiltInSkill {
+        name: "doc-coauthoring",
+        description: "Structured co-authoring workflow for substantial writing (design docs, RFCs, specs, proposals, long-form prose). Three stages: context gathering, section-by-section drafting, reader testing.",
+        content: include_str!("../../skills/doc-coauthoring/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "doc-editing",
+        description: "Collaborative writing of project documentation with section-by-section drafting where the user directs and curates rather than receiving a finished document. Applies Di\u{00e1}taxis type discipline and source-verified technical claims.",
+        content: include_str!("../../skills/doc-editing/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "full-review",
+        description: "Dispatch all review skills as independent fresh-context subagents against the current diff or working tree. Each subagent reads its skill file and the changes cold, reports severity-rated findings, and merges results after all complete.",
+        content: include_str!("../../skills/full-review/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "library-first-eval",
+        description: "Audit for homegrown implementations of solved problems. Walks every module looking for custom code that reimplements what an existing dependency or a well-maintained open-source library already provides.",
+        content: include_str!("../../skills/library-first-eval/SKILL.md"),
+    },
+    BuiltInSkill {
         name: "performance-eval",
         description: "Web performance evaluation using RAIL model, Core Web Vitals (LCP, INP, CLS), performance budgets, critical rendering path analysis, Lighthouse scoring, and anti-pattern detection.",
         content: include_str!("../../skills/performance-eval/SKILL.md"),
@@ -73,6 +103,11 @@ const BUILTIN_SKILLS: &[BuiltInSkill] = &[
         name: "playwright-missouri",
         description: "Writing missouri tests that need browser interaction \u{2014} testing web UIs, verifying rendered state, or automating browser workflows as part of state graph transitions.",
         content: include_str!("../../skills/playwright-missouri/SKILL.md"),
+    },
+    BuiltInSkill {
+        name: "product-eval",
+        description: "Structured product evaluation using Jobs-to-be-Done analysis, falsifiability testing, scope discipline, proving-slice critique, anti-metric audit, and risk identification. For PRDs, product briefs, feature specs, or phase plans.",
+        content: include_str!("../../skills/product-eval/SKILL.md"),
     },
     BuiltInSkill {
         name: "qa-cli",
