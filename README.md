@@ -31,7 +31,6 @@ without any configuration.
 ```
 almanac list                  # all available skills
 almanac show <name>           # full SKILL.md content
-almanac search <query>        # search skills by keyword
 almanac index                 # machine-readable JSON index
 almanac docs [topic]          # bundled documentation
 ```

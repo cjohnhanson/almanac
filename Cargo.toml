@@ -3,6 +3,13 @@ name = "almanac"
 version = "0.2.0"
 edition = "2024"
 description = "Agent skill aggregator — index and retrieve SKILL.md from pluggable sources"
+license = "MIT"
+repository = "https://github.com/cjohnhanson/almanac"
+homepage = "https://github.com/cjohnhanson/almanac"
+readme = "README.md"
+authors = ["Cody Hanson"]
+keywords = ["agent", "skills", "ai", "cli"]
+categories = ["command-line-utilities"]
 
 [lints.rust]
 unsafe_code = "forbid"
