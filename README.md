@@ -23,15 +23,14 @@ almanac docs [topic]          # bundled documentation
 
 ## How it works
 
-Skills come from three kinds of sources:
+Skills come from two kinds of sources today: built-in (26 general-purpose
+skills compiled into the binary) and local directories listed in a
+project's `.almanac.yml`. Remote git repos are on the roadmap.
 
-1. **Built-in** — 26 general-purpose skills compiled into the binary.
-2. **Local directories** — paths listed in a project's `.almanac.yml`.
-3. **Remote git repos** — planned, not yet implemented.
-
-Progressive disclosure is the point. `list` is cheap and fits in
-context; `show` loads a single skill's full instructions only when the
-agent decides one is relevant.
+The point is to keep the index cheap. `list` returns a one-line
+description per skill and fits comfortably in context; `show` loads
+a single skill's full instructions only when the agent decides one is
+relevant.
 
 ## Built-in skills
 
@@ -49,8 +48,8 @@ agent decides one is relevant.
 
 ## Configuration
 
-Drop a `.almanac.yml` (or `almanac.yml`) at the project root to add
-local skill directories on top of the built-ins:
+Drop an `almanac.yml` at the project root to add local skill
+directories on top of the built-ins:
 
 ```yaml
 sources:
@@ -60,7 +59,7 @@ sources:
 
 ## Documentation
 
-- [What is Almanac?](docs/what-is-almanac.md) — skill format, sources, progressive disclosure
+- [What is Almanac?](docs/what-is-almanac.md) — skill format, sources, design
 - [CLI Reference](docs/cli-reference.md) — complete command documentation
 
 ## Related
