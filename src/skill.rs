@@ -120,6 +120,11 @@ const BUILTIN_SKILLS: &[BuiltInSkill] = &[
         content: include_str!("../skills/qa-web/SKILL.md"),
     },
     BuiltInSkill {
+        name: "readme-authoring",
+        description: "Write a README that someone landing cold can use in 30 seconds. Lead with what it is and why someone would use it; show usage with a real example; cross-link to related work; cut clever openings.",
+        content: include_str!("../skills/readme-authoring/SKILL.md"),
+    },
+    BuiltInSkill {
         name: "research",
         description: "Structured research using Cynefin classification, PRISMA-style search accountability, Zettelkasten note processing, grounded theory coding, ACH for competing hypotheses, and source triangulation.",
         content: include_str!("../skills/research/SKILL.md"),
