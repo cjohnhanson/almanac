@@ -4,7 +4,7 @@ use crate::error::Error;
 use crate::source::SkillSource;
 
 /// A single skill entry: name, description, and where to find the full content.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SkillEntry {
     pub name: String,
     pub description: String,
@@ -12,13 +12,10 @@ pub struct SkillEntry {
 }
 
 /// Where the full SKILL.md content lives.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SkillLocation {
     /// On-disk path to the SKILL.md file.
     File(String),
-    /// Built into the binary; use `almanac show <name>`.
-    #[allow(dead_code)] // Populated when built-in skill content is authored.
-    BuiltIn,
 }
 
 /// YAML frontmatter parsed from a SKILL.md file.
@@ -30,152 +27,10 @@ struct SkillFrontmatter {
     description: Option<String>,
 }
 
-/// A built-in skill: name, description, and full content compiled into the binary.
-struct BuiltInSkill {
-    name: &'static str,
-    description: &'static str,
-    content: &'static str,
-}
-
-/// All built-in skills, baked into the binary at compile time.
-const BUILTIN_SKILLS: &[BuiltInSkill] = &[
-    BuiltInSkill {
-        name: "anti-slop",
-        description: "Pre-generation constraints for avoiding AI-written prose patterns. Applies to all writing: docs, READMEs, commit messages, PR descriptions, comments, essays.",
-        content: include_str!("../skills/anti-slop/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "api-design-eval",
-        description: "API design evaluation using Richardson REST maturity model, Google/Zalando/Microsoft guidelines, JSON:API patterns, and developer experience heuristics.",
-        content: include_str!("../skills/api-design-eval/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "architecture-eval",
-        description: "Architecture evaluation using ATAM quality attribute scenarios, ISO 25010 quality characteristics, coupling/cohesion analysis, SOLID at the system level, Conway's Law alignment, C4 model, ADR review, and technical debt assessment.",
-        content: include_str!("../skills/architecture-eval/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "code-review-eval",
-        description: "Structured code review using Fagan inspection passes, Google's priority hierarchy, SOLID principles, Fowler's code smells, and cognitive complexity.",
-        content: include_str!("../skills/code-review-eval/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "continuous-improvement",
-        description: "Driver-tick loop for long-running project sessions. A scheduled prompt fires on a regular cadence, dispatches fresh-eyes reviewers across review dimensions, and applies mechanical catches inline.",
-        content: include_str!("../skills/continuous-improvement/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "debugging",
-        description: "Structured debugging using scientific method, 5 Whys, Ishikawa fishbone diagrams, fault tree analysis, delta debugging, wolf fence bisection, Kepner-Tregoe IS/IS NOT analysis, and blameless incident investigation.",
-        content: include_str!("../skills/debugging/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "design-review",
-        description: "Systematic design evaluation for web UIs using Nielsen's heuristics, Gestalt principles, and cognitive walkthrough.",
-        content: include_str!("../skills/design-review/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "doc-coauthoring",
-        description: "Structured co-authoring workflow for substantial writing (design docs, RFCs, specs, proposals, long-form prose). Three stages: context gathering, section-by-section drafting, reader testing.",
-        content: include_str!("../skills/doc-coauthoring/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "doc-editing",
-        description: "Collaborative writing of project documentation with section-by-section drafting where the user directs and curates rather than receiving a finished document. Applies Di\u{00e1}taxis type discipline and source-verified technical claims.",
-        content: include_str!("../skills/doc-editing/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "full-review",
-        description: "Dispatch all review skills as independent fresh-context subagents against the current diff or working tree. Each subagent reads its skill file and the changes cold, reports severity-rated findings, and merges results after all complete.",
-        content: include_str!("../skills/full-review/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "library-first-eval",
-        description: "Audit for homegrown implementations of solved problems. Walks every module looking for custom code that reimplements what an existing dependency or a well-maintained open-source library already provides.",
-        content: include_str!("../skills/library-first-eval/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "performance-eval",
-        description: "Web performance evaluation using RAIL model, Core Web Vitals (LCP, INP, CLS), performance budgets, critical rendering path analysis, Lighthouse scoring, and anti-pattern detection.",
-        content: include_str!("../skills/performance-eval/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "playwright-missouri",
-        description: "Writing missouri tests that need browser interaction \u{2014} testing web UIs, verifying rendered state, or automating browser workflows as part of state graph transitions.",
-        content: include_str!("../skills/playwright-missouri/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "product-eval",
-        description: "Structured product evaluation using Jobs-to-be-Done analysis, falsifiability testing, scope discipline, primary-deliverable critique, guardrail-metric audit, and risk identification. For PRDs, product briefs, feature specs, or phase plans.",
-        content: include_str!("../skills/product-eval/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "qa-cli",
-        description: "Exploratory QA for CLI tools. Enumerates testable areas via SFDPOT heuristics adapted for command-line interfaces, dispatches sub-agents as independent checkers, evaluates results against consistency oracles.",
-        content: include_str!("../skills/qa-cli/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "qa-web",
-        description: "Exploratory QA for web UIs using agent-browser. Enumerates testable areas via SFDPOT heuristics, dispatches sub-agents as independent checkers, evaluates results against consistency oracles (FEW HICCUPPS), runs fresh-eyes sessions.",
-        content: include_str!("../skills/qa-web/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "readme-authoring",
-        description: "Write a README that someone landing cold can use in 30 seconds. Lead with what it is and why someone would use it; show usage with a real example; cross-link to related work; cut clever openings.",
-        content: include_str!("../skills/readme-authoring/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "research",
-        description: "Structured research using Cynefin classification, PRISMA-style search accountability, Zettelkasten note processing, grounded theory coding, ACH for competing hypotheses, and source triangulation.",
-        content: include_str!("../skills/research/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "security-review",
-        description: "Security evaluation using OWASP Top 10, STRIDE threat modeling, DREAD risk rating, and a structured review checklist covering input validation, auth, session management, cryptography, error handling, logging, data protection, and dependencies.",
-        content: include_str!("../skills/security-review/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "structured-thinking",
-        description: "Structured thinking and communication using Minto Pyramid (SCQA), BLUF, MECE issue trees, Six Thinking Hats, first principles, steel manning, OODA loop, and Socratic questioning.",
-        content: include_str!("../skills/structured-thinking/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "testing-strategy",
-        description: "Test strategy design using shape models (pyramid, trophy, diamond), Marick's testing quadrants, risk-based prioritization, RCRCRC regression selection, Beck's 12 test desiderata, Google's test size classification, and specialized techniques (contract, property-based, mutation testing).",
-        content: include_str!("../skills/testing-strategy/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "tisket-writing",
-        description: "Write well-scoped tisket issues using INVEST criteria, problem-first framing, testable acceptance criteria, and vertical slicing for decomposition.",
-        content: include_str!("../skills/tisket-writing/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "writing-docs-eval",
-        description: "Documentation-specific evaluation using IBM DQTI nine characteristics, Di\u{00e1}taxis per-type quality criteria, and Baker's Every Page is Page One principles.",
-        content: include_str!("../skills/writing-docs-eval/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "writing-review",
-        description: "Orchestrates writing evaluation by classifying content and dispatching the appropriate framework skills. Runs sentence-level checks, docs evaluation, readability metrics, voice consistency, and fresh-eyes review.",
-        content: include_str!("../skills/writing-review/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "writing-sentence-level",
-        description: "Sentence-level writing evaluation using Orwell's 6 rules, Williams' clarity diagnostics, readability metrics, and persuasion frameworks (AIDA/PAS).",
-        content: include_str!("../skills/writing-sentence-level/SKILL.md"),
-    },
-    BuiltInSkill {
-        name: "zettel",
-        description: "Working with the zettel knowledge base \u{2014} searching for context, creating notes on request, doing research, or exploring the note graph.",
-        content: include_str!("../skills/zettel/SKILL.md"),
-    },
-];
-
 /// Scan all configured skill sources and return an index of available skills.
+#[must_use] 
 pub fn index(project_dir: &Path, sources: &[SkillSource]) -> Vec<SkillEntry> {
     let mut entries = Vec::new();
-
-    entries.extend(builtin_skills());
 
     for source in sources {
         match source {
@@ -200,13 +55,11 @@ pub fn index(project_dir: &Path, sources: &[SkillSource]) -> Vec<SkillEntry> {
 /// When showing a skill (not a reference), appends a reference listing if the skill
 /// has a `references/` directory.
 pub fn show(name: &str, project_dir: &Path, sources: &[SkillSource]) -> Result<bool, Error> {
-    match show_captured(name, project_dir, sources)? {
-        Some(content) => {
-            print!("{content}");
-            Ok(true)
-        }
-        None => Ok(false),
-    }
+    let Some(content) = show_captured(name, project_dir, sources)? else {
+        return Ok(false);
+    };
+    print!("{content}");
+    Ok(true)
 }
 
 /// Return the content of a named skill (or reference) as a string.
@@ -221,26 +74,15 @@ pub fn show_captured(
         return show_reference(skill_name, ref_path, project_dir, sources);
     }
 
-    // Check built-in skills first.
-    for skill in BUILTIN_SKILLS {
-        if skill.name == name {
-            let mut content = skill.content.to_string();
-            append_builtin_references(name, &mut content);
-            return Ok(Some(content));
-        }
-    }
-
-    // Check file-based skills.
     let entries = index(project_dir, sources);
     for entry in &entries {
         if entry.name == name {
-            if let SkillLocation::File(path) = &entry.source {
-                let mut content = std::fs::read_to_string(path)
-                    .map_err(|e| Error::General(format!("failed to read {path}: {e}")))?;
-                let skill_dir = Path::new(path).parent().unwrap_or(Path::new("."));
-                append_file_references(name, skill_dir, &mut content);
-                return Ok(Some(content));
-            }
+            let SkillLocation::File(path) = &entry.source;
+            let mut content = std::fs::read_to_string(path)
+                .map_err(|e| Error::General(format!("failed to read {path}: {e}")))?;
+            let skill_dir = Path::new(path).parent().unwrap_or_else(|| Path::new("."));
+            append_file_references(name, skill_dir, &mut content);
+            return Ok(Some(content));
         }
     }
 
@@ -256,7 +98,7 @@ fn parse_reference_path(name: &str) -> Option<(&str, &str)> {
     Some(rest)
 }
 
-/// Fetch a reference file for a file-based or built-in skill.
+/// Fetch a reference file for a file-based skill.
 fn show_reference(
     skill_name: &str,
     ref_file: &str,
@@ -268,31 +110,17 @@ fn show_reference(
         return Ok(None);
     }
 
-    // Check built-in references first.
-    for skill in BUILTIN_SKILLS {
-        if skill.name == skill_name {
-            for r in builtin_references(skill_name) {
-                if r.name == ref_file {
-                    return Ok(Some(r.content.to_string()));
-                }
-            }
-            return Ok(None);
-        }
-    }
-
-    // Check file-based skills.
     let entries = index(project_dir, sources);
     for entry in &entries {
         if entry.name == skill_name {
-            if let SkillLocation::File(path) = &entry.source {
-                let skill_dir = Path::new(path).parent().unwrap_or(Path::new("."));
-                let ref_path = skill_dir.join("references").join(ref_file);
-                if ref_path.is_file() {
-                    let content = std::fs::read_to_string(&ref_path).map_err(|e| {
-                        Error::General(format!("failed to read {}: {e}", ref_path.display()))
-                    })?;
-                    return Ok(Some(content));
-                }
+            let SkillLocation::File(path) = &entry.source;
+            let skill_dir = Path::new(path).parent().unwrap_or_else(|| Path::new("."));
+            let ref_path = skill_dir.join("references").join(ref_file);
+            if ref_path.is_file() {
+                let content = std::fs::read_to_string(&ref_path).map_err(|e| {
+                    Error::General(format!("failed to read {}: {e}", ref_path.display()))
+                })?;
+                return Ok(Some(content));
             }
             return Ok(None);
         }
@@ -320,42 +148,13 @@ fn append_file_references(skill_name: &str, skill_dir: &Path, content: &mut Stri
     files.sort();
     content.push_str("\n\n## References\n\nUse `almanac show <skill>/references/<file>` to load a reference.\n\n");
     for file in &files {
-        content.push_str(&format!(
-            "  `almanac show {skill_name}/references/{file}`\n"
-        ));
+        use std::fmt::Write as _;
+        let _ = writeln!(content, "  `almanac show {skill_name}/references/{file}`");
     }
-}
-
-/// Append a references listing for a built-in skill.
-fn append_builtin_references(skill_name: &str, content: &mut String) {
-    let refs = builtin_references(skill_name);
-    if refs.is_empty() {
-        return;
-    }
-    content.push_str("\n\n## References\n\nUse `almanac show <skill>/references/<file>` to load a reference.\n\n");
-    for r in &refs {
-        content.push_str(&format!(
-            "  `almanac show {skill_name}/references/{}`\n",
-            r.name
-        ));
-    }
-}
-
-/// A built-in reference file.
-struct BuiltInReference {
-    name: &'static str,
-    content: &'static str,
-}
-
-/// Return built-in references for a skill. Currently empty — populated as
-/// skills gain reference files.
-fn builtin_references(_skill_name: &str) -> Vec<BuiltInReference> {
-    // TODO: match on skill_name and return include_str!() references
-    // when skills have references/ directories.
-    vec![]
 }
 
 /// Format the skill index for injection into agent context.
+#[must_use] 
 pub fn format_index(entries: &[SkillEntry]) -> String {
     if entries.is_empty() {
         return String::new();
@@ -369,34 +168,34 @@ pub fn format_index(entries: &[SkillEntry]) -> String {
 }
 
 /// Format just the skill list (no header). For callers that provide their own framing.
+#[must_use] 
 pub fn format_index_list(entries: &[SkillEntry]) -> String {
+    use std::fmt::Write as _;
     let mut out = String::new();
     for entry in entries {
-        let retrieval = match &entry.source {
-            SkillLocation::File(path) => format!("file: {path}"),
-            SkillLocation::BuiltIn => format!("`almanac show {}`", entry.name),
-        };
-        out.push_str(&format!(
-            "- **{}**: {} ({})\n",
+        let SkillLocation::File(path) = &entry.source;
+        let retrieval = format!("file: {path}");
+        let _ = writeln!(
+            out,
+            "- **{}**: {} ({})",
             entry.name, entry.description, retrieval
-        ));
+        );
     }
     out.push('\n');
     out
 }
 
 /// Format the skill index as JSON for machine consumption.
+#[must_use] 
 pub fn format_index_json(entries: &[SkillEntry]) -> String {
     let items: Vec<serde_json::Value> = entries
         .iter()
         .map(|e| {
+            let SkillLocation::File(path) = &e.source;
             serde_json::json!({
                 "name": e.name,
                 "description": e.description,
-                "source": match &e.source {
-                    SkillLocation::File(path) => serde_json::json!({"file": path}),
-                    SkillLocation::BuiltIn => serde_json::json!({"builtin": true}),
-                },
+                "source": serde_json::json!({"file": path}),
             })
         })
         .collect();
@@ -472,27 +271,15 @@ fn extract_frontmatter(content: &str) -> Option<&str> {
 }
 
 fn resolve_path(project_dir: &Path, path: &str) -> std::path::PathBuf {
-    if let Some(rest) = path.strip_prefix("~/") {
-        if let Some(home) = dirs::home_dir() {
+    if let Some(rest) = path.strip_prefix("~/")
+        && let Some(home) = dirs::home_dir() {
             return home.join(rest);
         }
-    }
     if Path::new(path).is_absolute() {
         Path::new(path).to_path_buf()
     } else {
         project_dir.join(path)
     }
-}
-
-fn builtin_skills() -> Vec<SkillEntry> {
-    BUILTIN_SKILLS
-        .iter()
-        .map(|s| SkillEntry {
-            name: s.name.to_string(),
-            description: s.description.to_string(),
-            source: SkillLocation::BuiltIn,
-        })
-        .collect()
 }
 
 #[cfg(test)]
@@ -600,9 +387,8 @@ mod tests {
         }];
 
         let entries = index(dir.path(), &sources);
-        let file_entries: Vec<_> = entries.iter().filter(|e| e.source != SkillLocation::BuiltIn).collect();
-        assert_eq!(file_entries.len(), 1);
-        assert_eq!(file_entries[0].name, "my-skill");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name, "my-skill");
     }
 
     #[test]
@@ -621,17 +407,14 @@ mod tests {
         }];
 
         let entries = index(dir.path(), &sources);
-        let file_entries: Vec<_> = entries.iter().filter(|e| e.source != SkillLocation::BuiltIn).collect();
-        assert_eq!(file_entries.len(), 1);
-        assert_eq!(file_entries[0].name, "local-skill");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name, "local-skill");
     }
 
     #[test]
-    fn index_empty_sources_returns_only_builtins() {
+    fn index_empty_sources_returns_nothing() {
         let dir = tempfile::tempdir().unwrap();
-        let entries = index(dir.path(), &[]);
-        assert_eq!(entries.len(), BUILTIN_SKILLS.len());
-        assert!(entries.iter().all(|e| e.source == SkillLocation::BuiltIn));
+        assert!(index(dir.path(), &[]).is_empty());
     }
 
     #[test]
@@ -640,8 +423,7 @@ mod tests {
         let sources = vec![SkillSource::Path {
             path: "/nonexistent/skills/".into(),
         }];
-        let entries = index(dir.path(), &sources);
-        assert_eq!(entries.len(), BUILTIN_SKILLS.len());
+        assert!(index(dir.path(), &sources).is_empty());
     }
 
     #[test]
@@ -715,7 +497,7 @@ mod tests {
             SkillEntry {
                 name: "b".into(),
                 description: "second".into(),
-                source: SkillLocation::BuiltIn,
+                source: SkillLocation::File("/b/SKILL.md".into()),
             },
         ];
         let json = format_index_json(&entries);
@@ -800,7 +582,7 @@ mod tests {
         assert!(!output.contains("## References"));
     }
 
-    /// Helper: capture show() output as a string instead of printing to stdout.
+    /// Helper: capture `show()` output as a string instead of printing to stdout.
     fn show_to_string(name: &str, project_dir: &Path, sources: &[SkillSource]) -> String {
         show_captured(name, project_dir, sources).unwrap().unwrap_or_default()
     }

@@ -1,0 +1,11 @@
+library: skills
+skills:
+- name: tisket-tips
+  source: dev:local-skills/tisket-tips
+  sha256: sha256-v1:0f63ade2e2c6919594896dcba882baa7f28eb4abecb48f809c52286995c1e8ac
+- name: remote-tips
+  source: git:file:///tmp/almanac-missouri-upstream
+  path: remote-skill
+  ref: main
+  rev: b5376407d0f817ca8a7b6c13476539e137c05ff8
+  sha256: sha256-v1:5e75cff8db024df83636c5ffd604d436ed03a9a89d70e51c32471b8cfa14599d

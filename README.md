@@ -23,39 +23,43 @@ almanac docs [topic]          # bundled documentation
 
 ## How it works
 
-Skills come from two kinds of sources today: built-in (26 general-purpose
-skills compiled into the binary) and local directories listed in a
-project's `.almanac.yml`. Remote git repos are on the roadmap.
+almanac is the curation and reproducibility layer for agent skills.
+Discovery and multi-agent installation belong to `npx skills` and the
+registries; almanac is what they lack: a manifest with pins,
+review-gated updates, and drift visibility for the skills you actually
+run — in an ecosystem where audited public skills carry prompt
+injection at a measured ~36%.
 
-The point is to keep the index cheap. `list` returns a one-line
-description per skill and fits comfortably in context; `show` loads
-a single skill's full instructions only when the agent decides one is
-relevant.
-
-## Built-in skills
-
-- **Review and evaluation** — `code-review-eval`, `architecture-eval`,
-  `api-design-eval`, `security-review`, `performance-eval`,
-  `design-review`, `library-first-eval`, `testing-strategy`,
-  `product-eval`, `full-review`
-- **Writing** — `writing-review`, `writing-docs-eval`,
-  `writing-sentence-level`, `anti-slop`, `doc-coauthoring`,
-  `doc-editing`, `readme-authoring`
-- **Process and thinking** — `structured-thinking`, `research`,
-  `debugging`, `tisket-writing`, `continuous-improvement`
-- **QA** — `qa-cli`, `qa-web`
-- **Tool integration** — `playwright-missouri`, `zettel`
-
-## Configuration
-
-Drop an `almanac.yml` at the project root to add local skill
-directories on top of the built-ins:
+`almanac.yml` governs a library directory. Every entry is pinned
+(commit + content hash) and every vendored directory is stamped as
+managed. `add` is trust-on-first-use with a mechanical red-flag scan
+and an explicit `--accept`; `update` shows the upstream diff and a
+fresh scan before re-pinning; `sync --check` fails loudly on drift.
+Nothing changes silently.
 
 ```yaml
-sources:
-  - path: ./.skills
-  - path: ~/skills
+library: skills
+skills:
+- name: gaff
+  source: github:cjohnhanson/gaff
+  path: skills/gaff
+  ref: main
+  rev: 849b76e2…full sha…
+  sha256: sha256-v1:…
 ```
+
+The index stays cheap for context injection: `list` is one line per
+skill, `show` loads one skill's full instructions on demand, and
+`index --md --max-bytes 4096` emits a budget-shaped skills index to
+wire into [gaff](https://github.com/cjohnhanson/gaff) as a cadence-
+refreshed prime section.
+
+## Sources
+
+- `github:owner/repo` (or bare `owner/repo`) — pinned by rev + hash
+- `git:<url>` — any git server, with a sha → ref → full-clone fetch fallback
+- `dev:<path>` — local snapshot for skills developed alongside; outside
+  the `sync --check` contract, drift reported as info
 
 ## Documentation
 

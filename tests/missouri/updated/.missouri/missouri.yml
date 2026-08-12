@@ -1,0 +1,15 @@
+doc: |
+  Pinned git entries are the check contract: tampering one fails
+  sync --check until restored.
+transitions:
+  - name: "pinned tamper fails the check, restore clears it"
+    command: |
+      cp skills/remote-tips/SKILL.md orig.md
+      printf 'injected\n' >> skills/remote-tips/SKILL.md
+      almanac sync --check >/dev/null 2>&1; c=$?
+      [ "$c" -eq 1 ] || { echo "FAIL: tamper not caught (exit $c)"; exit 1; }
+      mv orig.md skills/remote-tips/SKILL.md
+      almanac sync --check >/dev/null || { echo "FAIL: restore not clean"; exit 1; }
+      echo PIN_CHECK_OK
+    target: ../updated-verified
+    stdout: "PIN_CHECK_OK\n"

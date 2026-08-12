@@ -1,0 +1,5 @@
+managed-by: almanac
+name: remote-tips
+source: git:file:///tmp/almanac-missouri-upstream
+rev: b5376407d0f817ca8a7b6c13476539e137c05ff8
+sha256: sha256-v1:5e75cff8db024df83636c5ffd604d436ed03a9a89d70e51c32471b8cfa14599d

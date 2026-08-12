@@ -1,0 +1,17 @@
+env:
+  NO_COLOR: "1"
+  GIT_CONFIG_GLOBAL: "/dev/null"
+  GIT_CONFIG_SYSTEM: "/dev/null"
+  GIT_AUTHOR_NAME: "test"
+  GIT_AUTHOR_EMAIL: "t@t"
+  GIT_COMMITTER_NAME: "test"
+  GIT_COMMITTER_EMAIL: "t@t"
+  GIT_AUTHOR_DATE: "1600000000 +0000"
+  GIT_COMMITTER_DATE: "1600000000 +0000"
+setup:
+  - name: "build almanac"
+    command: "cargo build --quiet --manifest-path ../../Cargo.toml"
+  - name: "link binary"
+    command: "mkdir -p .missouri/bin && ln -sf $(cd ../.. && pwd)/target/debug/almanac .missouri/bin/almanac"
+packages:
+  - jq

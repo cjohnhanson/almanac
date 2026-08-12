@@ -25,6 +25,48 @@ pub struct Args {
 
 #[derive(Parser)]
 pub enum Command {
+    /// Create an almanac.yml manifest governing a library directory.
+    Init {
+        /// Library directory, relative to the manifest.
+        #[arg(long, default_value = "skills")]
+        library: String,
+    },
+    /// Fetch a skill, show its red-flag report, and (with --accept) vendor + pin it.
+    Add {
+        /// github:owner/repo, owner/repo, git:<url>, or dev:<path>.
+        source: String,
+        /// Manifest name (must match the SKILL.md frontmatter name).
+        #[arg(long)]
+        name: Option<String>,
+        /// Skill directory within the source.
+        #[arg(long)]
+        path: Option<String>,
+        /// Branch or tag to resolve.
+        #[arg(long = "ref")]
+        r#ref: Option<String>,
+        /// Exact commit to pin.
+        #[arg(long)]
+        rev: Option<String>,
+        /// Accept the staged content into the library (trust-on-first-use).
+        #[arg(long)]
+        accept: bool,
+    },
+    /// Materialize every pinned entry; --check verifies instead (exit 1 on drift).
+    Sync {
+        #[arg(long)]
+        check: bool,
+    },
+    /// Fetch upstream, show red flags + diff, re-pin with --yes.
+    Update {
+        /// Entry names (default: all git-sourced entries).
+        names: Vec<String>,
+        #[arg(long, short = 'y')]
+        yes: bool,
+    },
+    /// Remove an entry and its vendored directory (refuses unmanaged dirs).
+    Remove { name: String },
+    /// Manifest entries with pin, drift state, and unmanaged co-tenants.
+    Status,
     /// List all available skills (name + description + source).
     List {
         /// Skill source directories (repeatable).
@@ -45,6 +87,13 @@ pub enum Command {
         /// Skill source directories (repeatable).
         #[arg(long = "source", short = 's')]
         sources: Vec<String>,
+        /// Emit a markdown skills index (a gaff prime-section payload).
+        #[arg(long)]
+        md: bool,
+        /// Byte budget for --md; degrades to name-only lines, then a
+        /// truncation note (default 4096, matching gaff's inject cap).
+        #[arg(long, default_value_t = 4096)]
+        max_bytes: usize,
     },
     /// Browse bundled documentation.
     Docs {
@@ -56,11 +105,7 @@ pub enum Command {
 }
 
 /// Run a CLI command (used when almanac is mounted as a subcommand by clc).
-pub fn run_command(
-    root: &Path,
-    sources: &[SkillSource],
-    command: Command,
-) -> Result<(), Error> {
+pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Result<(), Error> {
     match command {
         Command::List {
             sources: extra_sources,
@@ -82,12 +127,41 @@ pub fn run_command(
         }
         Command::Index {
             sources: extra_sources,
+            md,
+            max_bytes,
         } => {
-            let all_sources = merge_sources(sources, &extra_sources);
-            cmd_index(root, &all_sources);
+            if md {
+                print!("{}", crate::ops::index_md(root, max_bytes)?);
+            } else {
+                let all_sources = merge_sources(sources, &extra_sources);
+                cmd_index(root, &all_sources);
+            }
             Ok(())
         }
         Command::Docs { topic, query } => cmd_docs(topic.as_deref(), query.as_deref()),
+        Command::Init { library } => crate::ops::init(root, &library),
+        Command::Add {
+            source,
+            name,
+            path,
+            r#ref,
+            rev,
+            accept,
+        } => crate::ops::add(
+            root,
+            &source,
+            &crate::ops::AddOpts {
+                name,
+                path,
+                r#ref,
+                rev,
+                accept,
+            },
+        ),
+        Command::Sync { check } => crate::ops::sync(root, check),
+        Command::Update { names, yes } => crate::ops::update(root, &names, yes),
+        Command::Remove { name } => crate::ops::remove(root, &name),
+        Command::Status => crate::ops::list(root),
     }
 }
 
@@ -105,11 +179,7 @@ fn cmd_list(root: &Path, sources: &[SkillSource]) {
         return;
     }
     for entry in &entries {
-        let source_label = match &entry.source {
-            skill::SkillLocation::File(_) => "file",
-            skill::SkillLocation::BuiltIn => "built-in",
-        };
-        println!("{:<30} {} [{}]", entry.name, entry.description, source_label);
+        println!("{:<30} {} [file]", entry.name, entry.description);
     }
 }
 
@@ -142,13 +212,12 @@ fn cmd_docs(topic: Option<&str>, query: Option<&str>) -> Result<(), Error> {
         Some(identifier) => {
             if let Some(page) = docs::find(identifier) {
                 print!("{}", page.content());
-                Ok(())
-            } else {
-                eprintln!("unknown doc: {identifier}");
-                eprintln!();
-                print!("{}", docs::format_list(docs::PAGES));
-                Err(Error::General(format!("doc '{identifier}' not found")))
+                return Ok(());
             }
+            eprintln!("unknown doc: {identifier}");
+            eprintln!();
+            print!("{}", docs::format_list(docs::PAGES));
+            Err(Error::General(format!("doc '{identifier}' not found")))
         }
     }
 }

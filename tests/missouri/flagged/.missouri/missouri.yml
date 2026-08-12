@@ -1,0 +1,15 @@
+doc: |
+  Red flags surface at add time; TOFU still allows an explicit accept.
+transitions:
+  - name: "flags reported, accept records them knowingly"
+    command: |
+      almanac init >/dev/null || { echo "FAIL: init"; exit 1; }
+      OUT=$(almanac add dev:dirty-skills/sketchy 2>&1); c=$?
+      [ "$c" -eq 1 ] || { echo "FAIL: unaccepted exit $c"; exit 1; }
+      printf '%s' "$OUT" | grep -q "allowed-tools" || { echo "FAIL: no frontmatter flag: $OUT"; exit 1; }
+      printf '%s' "$OUT" | grep -q "pipe-to-shell" || { echo "FAIL: no pipe flag: $OUT"; exit 1; }
+      almanac add dev:dirty-skills/sketchy --accept >/dev/null || { echo "FAIL: accept"; exit 1; }
+      [ -f skills/sketchy/.almanac-origin ] || { echo "FAIL: not vendored"; exit 1; }
+      echo FLAGGED_OK
+    target: ../flagged-done
+    stdout: "FLAGGED_OK\n"

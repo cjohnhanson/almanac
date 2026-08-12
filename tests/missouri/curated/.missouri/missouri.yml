@@ -1,0 +1,60 @@
+doc: |
+  A curated library: tamper detection, git-source add/update with a
+  hermetic file:// upstream, unmanaged neighbors respected, index --md.
+transitions:
+  - name: "dev tamper shows as drift but stays outside the check contract"
+    command: |
+      cp skills/tisket-tips/SKILL.md orig.md
+      printf 'injected\n' >> skills/tisket-tips/SKILL.md
+      almanac status | grep -q "tisket-tips.*drifted" || { echo "FAIL: status not drifted"; exit 1; }
+      almanac sync --check >/dev/null || { echo "FAIL: dev drift failed the check"; exit 1; }
+      almanac sync --check 2>/dev/null | grep -q "skip.*tisket-tips" || { echo "FAIL: no skip line"; exit 1; }
+      mv orig.md skills/tisket-tips/SKILL.md
+      almanac status | grep -q "tisket-tips.*clean" || { echo "FAIL: restore not clean"; exit 1; }
+      echo TAMPER_OK
+    target: ../curated-verified
+    stdout: "TAMPER_OK\n"
+  - name: "git source: add pinned, upstream moves, diff-gated update"
+    command: |
+      U=/tmp/almanac-missouri-upstream
+      rm -rf "$U" && mkdir -p "$U/remote-skill"
+      git -C "$U" init -q -b main
+      printf -- '---\nname: remote-tips\ndescription: Remote wisdom.\n---\n\nVersion one.\n' > "$U/remote-skill/SKILL.md"
+      git -C "$U" add -A && git -C "$U" commit -qm one
+      almanac add "git:file://$U" --path remote-skill --accept >/dev/null || { echo "FAIL: git add"; exit 1; }
+      R1=$(git -C "$U" rev-parse HEAD)
+      grep -q "rev: $R1" almanac.yml || { echo "FAIL: rev not pinned"; exit 1; }
+      printf -- '---\nname: remote-tips\ndescription: Remote wisdom.\n---\n\nVersion two.\n' > "$U/remote-skill/SKILL.md"
+      GIT_AUTHOR_DATE="1600000100 +0000" GIT_COMMITTER_DATE="1600000100 +0000" git -C "$U" commit -qam two
+      OUT=$(almanac update remote-tips)
+      printf '%s' "$OUT" | grep -q "not applied" || { echo "FAIL: applied without --yes: $OUT"; exit 1; }
+      grep -q "Version one" skills/remote-tips/SKILL.md || { echo "FAIL: changed without --yes"; exit 1; }
+      almanac update remote-tips --yes >/dev/null || { echo "FAIL: update --yes"; exit 1; }
+      grep -q "Version two" skills/remote-tips/SKILL.md || { echo "FAIL: not updated"; exit 1; }
+      R2=$(git -C "$U" rev-parse HEAD)
+      grep -q "rev: $R2" almanac.yml || { echo "FAIL: rev not re-pinned"; exit 1; }
+      rm -rf "$U"
+      echo UPDATE_OK
+    target: ../updated
+    stdout: "UPDATE_OK\n"
+  - name: "unmanaged neighbors are listed, never deleted"
+    command: |
+      mkdir -p skills/hand-made
+      printf -- '---\nname: hand-made\ndescription: Dropped in by hand.\n---\nBody.\n' > skills/hand-made/SKILL.md
+      almanac status | grep -q "hand-made.*unmanaged" || { echo "FAIL: unmanaged not listed"; exit 1; }
+      almanac remove hand-made >/dev/null 2>&1; c=$?
+      [ "$c" -eq 1 ] || { echo "FAIL: removed an unmanaged dir (exit $c)"; exit 1; }
+      [ -f skills/hand-made/SKILL.md ] || { echo "FAIL: unmanaged dir deleted"; exit 1; }
+      echo NEIGHBORS_OK
+    target: ../curated-neighbors
+    stdout: "NEIGHBORS_OK\n"
+  - name: "index --md degrades under a byte budget"
+    command: |
+      OUT=$(almanac index --md)
+      printf '%s' "$OUT" | grep -q -- "- \*\*tisket-tips\*\* — Tips for writing tisket issues well." || { echo "FAIL: full line missing: $OUT"; exit 1; }
+      SMALL=$(almanac index --md --max-bytes 100)
+      printf '%s' "$SMALL" | grep -q "truncated" || { echo "FAIL: no truncation note: $SMALL"; exit 1; }
+      [ "${#SMALL}" -le 100 ] || { echo "FAIL: over budget: ${#SMALL}"; exit 1; }
+      echo INDEX_OK
+    target: ../curated-indexed
+    stdout: "INDEX_OK\n"

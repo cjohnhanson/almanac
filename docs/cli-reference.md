@@ -34,7 +34,7 @@ almanac list [--source <path>]
 |--------|-------|-------------|
 | `--source <path>` | `-s` | Skill source directory. Repeatable — each adds another source |
 
-Output columns: `NAME`, `DESCRIPTION`, `[SOURCE_TYPE]`. Source types are `file` (local directory) or `built-in` (compiled into the binary).
+Output columns: `NAME`, `DESCRIPTION`, `[SOURCE_TYPE]`. Skills come from path sources (`file`); nothing is compiled into the binary — the curated library (see `almanac docs curation`) is the primary source.
 
 ### `almanac show <name>`
 

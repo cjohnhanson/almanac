@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// A source of agent skills: a local directory or a git repo.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum SkillSource {
     /// Local directory containing skill subdirectories with SKILL.md files.

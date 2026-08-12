@@ -1,0 +1,18 @@
+doc: |
+  init → add a dev-source skill (TOFU: refused without --accept) →
+  vendored, stamped, pinned.
+transitions:
+  - name: "init, add with accept gate, status clean"
+    command: |
+      almanac init >/dev/null || { echo "FAIL: init"; exit 1; }
+      almanac add dev:local-skills/tisket-tips >/dev/null 2>&1; c=$?
+      [ "$c" -eq 1 ] || { echo "FAIL: unaccepted add exit $c"; exit 1; }
+      [ ! -d skills/tisket-tips ] || { echo "FAIL: landed without accept"; exit 1; }
+      OUT=$(almanac add dev:local-skills/tisket-tips --accept)
+      printf '%s' "$OUT" | grep -q "red-flag scan: tisket-tips: clean" || { echo "FAIL: no clean scan: $OUT"; exit 1; }
+      [ -f skills/tisket-tips/.almanac-origin ] || { echo "FAIL: no stamp"; exit 1; }
+      almanac status | grep -q "tisket-tips.*clean" || { echo "FAIL: status"; exit 1; }
+      almanac sync --check >/dev/null || { echo "FAIL: check on clean dev"; exit 1; }
+      echo WORKFLOW_OK
+    target: ../curated
+    stdout: "WORKFLOW_OK\n"
