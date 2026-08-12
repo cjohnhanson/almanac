@@ -1,4 +1,4 @@
-//! Bundled documentation, baked in at compile time.
+//! Bundled documentation, compiled into the binary.
 
 /// A single documentation page.
 pub struct DocPage {
@@ -9,7 +9,7 @@ pub struct DocPage {
 }
 
 impl DocPage {
-    /// Return the markdown content with the metadata comment stripped.
+    /// Return the markdown content without the metadata comment.
     #[must_use] 
     pub fn content(&self) -> &str {
         let md = self.raw;
@@ -26,7 +26,7 @@ pub static PAGES: &[DocPage] = &[
     DocPage {
         slug: "curation",
         title: "Curation and pinning",
-        description: "The manifest workflow — add, sync, update, drift, and the trust model.",
+        description: "The manifest workflow: add, sync, update, drift, and the trust model.",
         raw: include_str!("../docs/curation.md"),
     },
     DocPage {
@@ -102,7 +102,8 @@ pub fn find_in<'a>(pages: &'a [DocPage], identifier: &str) -> Option<&'a DocPage
     None
 }
 
-/// Format a listing of doc pages showing slug (what to type) and description.
+/// Format a listing of doc pages. Shows the slug to type, then the
+/// description.
 #[must_use] 
 pub fn format_list(pages: &[DocPage]) -> String {
     use std::fmt::Write as _;

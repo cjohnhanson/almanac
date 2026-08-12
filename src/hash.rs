@@ -1,22 +1,29 @@
 //! Content hashing for vendored skill directories.
 //!
-//! Versioned, framed, filesystem-independent:
+//! The scheme is versioned and framed. It gives the same hash on every
+//! filesystem:
 //!
-//! - Entries sorted by raw path bytes; paths are `/`-separated relative
-//!   paths, NFC-normalized (macOS git precomposes; Linux does not —
-//!   without normalization the same tree hashes differently by OS).
-//! - Each entry framed as `u64_le(len(path)) ‖ path ‖ kind ‖
-//!   u64_le(len(payload)) ‖ payload`, where kind is `f` (regular),
-//!   `x` (executable), or `l` (symlink, payload = link target). Framing
-//!   kills concatenation ambiguity (`ab`+`c` vs `a`+`bc`).
-//! - Deny-listed names are excluded everywhere: `.DS_Store`, `.git`,
-//!   `__pycache__`, and almanac's own `.almanac-origin` stamp.
-//! - Empty directories contribute nothing and are not carried.
-//! - Stored form is prefixed `sha256-v1:` so the scheme can evolve.
+//! - The hash sorts entries by the raw bytes of the path. A path is
+//!   relative, uses `/` as the separator, and is NFC-normalized. Git on
+//!   macOS precomposes, and git on Linux does not. Without
+//!   normalization the same tree hashes differently on each one.
+//! - Each entry is framed as `u64_le(len(path)) ‖ path ‖ kind ‖
+//!   u64_le(len(payload)) ‖ payload`. The kind is `f` for a regular
+//!   file, `x` for an executable file, or `l` for a symlink, where the
+//!   payload is the link target. The framing removes the ambiguity
+//!   between `ab`+`c` and `a`+`bc`.
+//! - The hash excludes the deny-listed names everywhere: `.DS_Store`,
+//!   `.git`, `__pycache__`, and almanac's own `.almanac-origin` stamp.
+//! - An empty directory adds nothing to the hash, and almanac does not
+//!   carry it.
+//! - The stored form starts with `sha256-v1:`, so the scheme can
+//!   change later.
 //!
-//! Hard errors, not silent lossiness: paths that collide
-//! case-insensitively (this machine's APFS is case-insensitive — such a
-//! tree cannot round-trip here) and symlinks escaping the root.
+//! Two cases are hard errors, because almanac must not lose content
+//! quietly. The first is two paths that collide when the case is
+//! ignored, because such a tree cannot round-trip on a
+//! case-insensitive filesystem. The second is a symlink that points
+//! outside the root.
 
 use std::path::{Path, PathBuf};
 
@@ -38,9 +45,9 @@ impl std::fmt::Display for HashError {
         match self {
             Self::CaseCollision(a, b) => write!(
                 f,
-                "paths `{a}` and `{b}` collide case-insensitively; this tree cannot round-trip on case-insensitive filesystems"
+                "paths `{a}` and `{b}` collide when the case is ignored; this tree cannot round-trip on a case-insensitive filesystem"
             ),
-            Self::EscapingSymlink(p) => write!(f, "symlink `{p}` escapes the skill root"),
+            Self::EscapingSymlink(p) => write!(f, "symlink `{p}` points outside the skill root"),
             Self::Unreadable(p) => write!(f, "cannot read `{p}`"),
         }
     }

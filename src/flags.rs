@@ -1,9 +1,10 @@
-//! Mechanical red-flag scan, run at add and update time.
+//! Mechanical red-flag scan. It runs at add time and at update time.
 //!
-//! A prose diff is a weak instrument against prompt injection (and
-//! `git diff --no-index` reduces any NUL-bearing file to one "binary
-//! files differ" line), so the reviewable moments get a mechanical
-//! report first. Flags are signals for the human, never verdicts.
+//! A prose diff is weak against prompt injection. `git diff --no-index`
+//! also reduces a file that holds NUL bytes to one "binary files
+//! differ" line. So almanac prints a mechanical report first, at every
+//! point where a person reviews content. A flag is a signal to read,
+//! never a verdict.
 
 use std::path::Path;
 
@@ -17,8 +18,8 @@ pub struct Flag {
 
 const TOOL_KEYS: [&str; 3] = ["allowed-tools", "disable-model-invocation", "context"];
 
-/// Scan a vendored skill tree. Best-effort: unreadable files are
-/// themselves flagged, never silently skipped.
+/// Scan a staged skill tree. The scan does what it can: it flags a file
+/// it cannot read instead of skipping it.
 #[must_use]
 pub fn scan(root: &Path) -> Vec<Flag> {
     let mut flags = Vec::new();
@@ -87,7 +88,7 @@ fn inspect_file(p: &Path, rp: &str, root: &Path, flags: &mut Vec<Flag>) {
         return;
     };
     if bytes.contains(&0) {
-        push("contains NUL bytes (invisible to git diff review)");
+        push("contains NUL bytes; a git diff does not show them");
         return;
     }
     let Ok(text) = String::from_utf8(bytes) else {
@@ -100,9 +101,7 @@ fn inspect_file(p: &Path, rp: &str, root: &Path, flags: &mut Vec<Flag>) {
         let frontmatter = &text[..fm_end];
         for key in TOOL_KEYS {
             if frontmatter.contains(&format!("{key}:")) {
-                push(&format!(
-                    "frontmatter grants/limits agent behavior: `{key}`"
-                ));
+                push(&format!("frontmatter controls agent behavior: `{key}`"));
             }
         }
     }
@@ -112,7 +111,7 @@ fn inspect_file(p: &Path, rp: &str, root: &Path, flags: &mut Vec<Flag>) {
         if matches!(cp, 0x200B..=0x200F | 0x202A..=0x202E | 0x2066..=0x2069)
             || (0xE0000..=0xE007F).contains(&cp)
         {
-            push("invisible/bidirectional unicode (possible hidden instructions)");
+            push("invisible/bidirectional unicode; it can hide instructions");
             break;
         }
     }

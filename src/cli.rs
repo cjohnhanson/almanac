@@ -11,11 +11,11 @@ use crate::source::SkillSource;
 #[command(
     name = "almanac",
     version,
-    about = "Agent skill aggregator — index and retrieve skills from pluggable sources",
+    about = "Almanac curates agent skills and indexes them for agents to read",
     max_term_width = 98
 )]
 pub struct Args {
-    /// Project root directory (default: current directory).
+    /// Project root directory. Defaults to the current directory.
     #[arg(long, global = true, default_value = ".")]
     pub root: String,
 
@@ -25,17 +25,17 @@ pub struct Args {
 
 #[derive(Parser)]
 pub enum Command {
-    /// Create an almanac.yml manifest governing a library directory.
+    /// Create an almanac.yml manifest that governs a library directory.
     Init {
         /// Library directory, relative to the manifest.
         #[arg(long, default_value = "skills")]
         library: String,
     },
-    /// Fetch a skill, show its red-flag report, and (with --accept) vendor + pin it.
+    /// Fetch a skill, print its red-flag report, and vendor it with --accept.
     Add {
         /// github:owner/repo, owner/repo, git:<url>, or dev:<path>.
         source: String,
-        /// Manifest name (must match the SKILL.md frontmatter name).
+        /// Manifest name. Must match the SKILL.md frontmatter name.
         #[arg(long)]
         name: Option<String>,
         /// Skill directory within the source.
@@ -47,64 +47,66 @@ pub enum Command {
         /// Exact commit to pin.
         #[arg(long)]
         rev: Option<String>,
-        /// Accept the staged content into the library (trust-on-first-use).
+        /// Accept the staged content into the library. Trust on first use.
         #[arg(long)]
         accept: bool,
     },
-    /// Materialize every pinned entry; --check verifies instead (exit 1 on drift).
+    /// Write every pinned entry to disk. --check verifies instead, and exits 1 on drift.
     Sync {
         #[arg(long)]
         check: bool,
     },
-    /// Fetch upstream, show red flags + diff, re-pin with --yes.
+    /// Fetch upstream, print the red flags and the diff, then re-pin with --yes.
     Update {
-        /// Entry names (default: all git-sourced entries).
+        /// Entry names. Defaults to every git-sourced entry.
         names: Vec<String>,
         #[arg(long, short = 'y')]
         yes: bool,
     },
-    /// Remove an entry and its vendored directory (refuses unmanaged dirs).
+    /// Remove an entry and its vendored directory. Refuses an unmanaged directory.
     Remove { name: String },
-    /// Manifest entries with pin, drift state, and unmanaged co-tenants.
+    /// Print every manifest entry with its pin and drift state, then the unmanaged neighbors.
     Status,
-    /// List all available skills (name + description + source).
+    /// List the available skills with name, description, and source.
     List {
         /// Skill source directories (repeatable).
         #[arg(long = "source", short = 's')]
         sources: Vec<String>,
     },
-    /// Print the full SKILL.md content of a named skill.
+    /// Print the full SKILL.md content of one skill.
     Show {
-        /// The skill name to display.
+        /// The skill name to print.
         name: String,
 
         /// Skill source directories (repeatable).
         #[arg(long = "source", short = 's')]
         sources: Vec<String>,
     },
-    /// Print a machine-readable JSON index of all available skills.
+    /// Print a JSON index of the available skills.
     Index {
         /// Skill source directories (repeatable).
         #[arg(long = "source", short = 's')]
         sources: Vec<String>,
-        /// Emit a markdown skills index (a gaff prime-section payload).
+        /// Print a markdown skills index, as a gaff prime-section payload.
         #[arg(long)]
         md: bool,
-        /// Byte budget for --md; degrades to name-only lines, then a
-        /// truncation note (default 4096, matching gaff's inject cap).
+        /// Byte budget for --md. The output degrades to name-only
+        /// lines, then to a truncation note. Defaults to 4096, which
+        /// matches gaff's inject cap.
         #[arg(long, default_value_t = 4096)]
         max_bytes: usize,
     },
     /// Browse bundled documentation.
     Docs {
-        /// Topic slug to display, or "search" to search.
+        /// Topic slug to print, or "search" to search.
         topic: Option<String>,
-        /// Search query (when topic is "search").
+        /// Search query. Used when the topic is "search".
         query: Option<String>,
     },
 }
 
-/// Run a CLI command (used when almanac is mounted as a subcommand by clc).
+/// Run one CLI command. clc calls this when it mounts almanac as a
+/// subcommand.
 pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Result<(), Error> {
     match command {
         Command::List {
@@ -165,7 +167,7 @@ pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Re
     }
 }
 
-/// Run from standalone binary (reads config or uses CLI args only).
+/// Run the standalone binary. It uses the CLI arguments only.
 pub fn run(args: Args) -> Result<(), Error> {
     let root = Path::new(&args.root);
     // Standalone mode: no config sources, only CLI --source flags.
@@ -222,7 +224,7 @@ fn cmd_docs(topic: Option<&str>, query: Option<&str>) -> Result<(), Error> {
     }
 }
 
-/// Merge config-provided sources with CLI --source flags.
+/// Merge the sources from the config with the CLI --source flags.
 fn merge_sources(config_sources: &[SkillSource], cli_sources: &[String]) -> Vec<SkillSource> {
     let mut all: Vec<SkillSource> = config_sources.to_vec();
     for s in cli_sources {

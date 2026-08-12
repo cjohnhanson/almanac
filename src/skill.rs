@@ -14,7 +14,7 @@ pub struct SkillEntry {
 /// Where the full SKILL.md content lives.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SkillLocation {
-    /// On-disk path to the SKILL.md file.
+    /// Path to the SKILL.md file on disk.
     File(String),
 }
 
@@ -49,11 +49,12 @@ pub fn index(project_dir: &Path, sources: &[SkillSource]) -> Vec<SkillEntry> {
     entries
 }
 
-/// Print the full content of a named skill. Returns Ok(true) if found, Ok(false) if not.
+/// Print the full content of one skill. Returns Ok(true) when the
+/// skill is found, and Ok(false) when it is not.
 ///
-/// Supports `name/references/<file>` paths for fetching individual reference files.
-/// When showing a skill (not a reference), appends a reference listing if the skill
-/// has a `references/` directory.
+/// A `name/references/<file>` path fetches one reference file. When the
+/// name is a skill, and the skill directory has a `references/`
+/// directory, the output ends with a listing of those files.
 pub fn show(name: &str, project_dir: &Path, sources: &[SkillSource]) -> Result<bool, Error> {
     let Some(content) = show_captured(name, project_dir, sources)? else {
         return Ok(false);
@@ -62,8 +63,8 @@ pub fn show(name: &str, project_dir: &Path, sources: &[SkillSource]) -> Result<b
     Ok(true)
 }
 
-/// Return the content of a named skill (or reference) as a string.
-/// Returns Ok(None) if not found.
+/// Return the content of one skill, or of one reference file, as a
+/// string. Returns Ok(None) when it is not found.
 pub fn show_captured(
     name: &str,
     project_dir: &Path,
@@ -129,7 +130,8 @@ fn show_reference(
     Ok(None)
 }
 
-/// Append a references listing to content if the file-based skill has a references/ dir.
+/// Append a references listing when the skill directory holds a
+/// references/ directory.
 fn append_file_references(skill_name: &str, skill_dir: &Path, content: &mut String) {
     let refs_dir = skill_dir.join("references");
     if !refs_dir.is_dir() {
@@ -167,7 +169,8 @@ pub fn format_index(entries: &[SkillEntry]) -> String {
     out
 }
 
-/// Format just the skill list (no header). For callers that provide their own framing.
+/// Format the skill list without a header. Use it when the caller
+/// supplies its own framing.
 #[must_use] 
 pub fn format_index_list(entries: &[SkillEntry]) -> String {
     use std::fmt::Write as _;
@@ -185,7 +188,7 @@ pub fn format_index_list(entries: &[SkillEntry]) -> String {
     out
 }
 
-/// Format the skill index as JSON for machine consumption.
+/// Format the skill index as JSON for a machine to read.
 #[must_use] 
 pub fn format_index_json(entries: &[SkillEntry]) -> String {
     let items: Vec<serde_json::Value> = entries
@@ -248,7 +251,8 @@ fn parse_skill_md(skill_md: &Path, skill_dir: &Path) -> Result<SkillEntry, Error
 
     let name = parsed.name.unwrap_or_else(|| dir_name.to_string());
 
-    // Warn if name doesn't match directory name per agentskills.io spec.
+    // The agentskills.io spec requires the name to match the directory
+    // name. Warn when it does not.
     if name != dir_name {
         eprintln!(
             "warning: skill name '{name}' does not match directory '{dir_name}' in {}",

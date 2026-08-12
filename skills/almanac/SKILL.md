@@ -1,23 +1,27 @@
 ---
 name: almanac
-description: Curate a pinned, review-gated library of agent skills with almanac — vendor skills from git repos or local paths into a manifest-governed directory, detect drift, gate updates behind diffs and red-flag scans, and emit a markdown skills index for context injection. Use when adding a skill to a repo's curated library, checking library integrity, or updating pinned skills.
+description: Curate a pinned, review-gated library of agent skills with almanac. Vendor skills from git repos or local paths into a manifest-governed directory, detect drift, gate updates behind diffs and red-flag scans, and print a markdown skills index for context injection. Use when adding a skill to a repo's curated library, checking library integrity, or updating pinned skills.
 ---
 
 # almanac
 
-The library is governed by almanac.yml next to it. Everything vendored
-is pinned (rev + content hash) and stamped; nothing changes silently.
+`almanac.yml` governs the library directory next to it. Almanac pins
+every vendored skill to a commit and a content hash, and it stamps
+every vendored directory. No change lands without a report.
 
 ## Rules
 
-- Never edit files inside a vendored skill directory — fix upstream and
-  `almanac update <name>`, or use a dev: source for local iteration.
-- `almanac add <source>` stages and reports red flags; nothing lands
-  without --accept. Treat the report as signals to read, not noise.
-- Run `almanac sync --check` to verify library integrity (exit 1 on
-  drift of any pinned entry; dev: snapshots are exempt).
-- `almanac status` shows every entry's pin and drift state, plus
-  unmanaged neighbor directories almanac will never touch.
+- Never edit a file inside a vendored skill directory. Fix it upstream
+  and run `almanac update <name>`, or use a `dev:` source to iterate
+  locally.
+- Run `almanac add <source>` to stage a skill and print its red-flag
+  report. Nothing lands without `--accept`. Read the report; the flags
+  are signals, not verdicts.
+- Run `almanac sync --check` to verify the library. It exits 1 when a
+  pinned entry drifts. It skips `dev:` snapshots.
+- Run `almanac status` to see the pin and drift state of every entry.
+  It also lists unmanaged neighbor directories, which almanac never
+  touches.
 
 ## Common calls
 

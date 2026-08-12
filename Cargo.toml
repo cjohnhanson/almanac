@@ -2,7 +2,7 @@
 name = "almanac"
 version = "0.2.0"
 edition = "2024"
-description = "Agent skill aggregator — index and retrieve SKILL.md from pluggable sources"
+description = "Almanac curates agent skills and indexes them for agents to read"
 license = "MIT"
 repository = "https://github.com/cjohnhanson/almanac"
 homepage = "https://github.com/cjohnhanson/almanac"

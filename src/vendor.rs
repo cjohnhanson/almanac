@@ -1,10 +1,12 @@
-//! Fetching sources and vendoring skill trees into the library.
+//! Fetches sources and vendors skill trees into the library.
 //!
-//! Git operations shell out to the git CLI. Fetch strategy for a pinned
-//! rev: depth-1 SHA fetch (GitHub allows it), then the recorded ref with
-//! a full fetch, then a full clone — the path taken is reported. Copies
-//! honor the hash deny-list, refuse escaping symlinks, and stamp the
-//! vendored dir with `.almanac-origin` so the managed set is explicit.
+//! Almanac runs the git CLI for every git operation. To fetch a pinned
+//! commit it tries a depth-1 sha fetch, which GitHub permits. It then
+//! tries a full fetch of the recorded ref. It then tries a full clone.
+//! It reports the path that worked. A copy honors the hash deny-list
+//! and refuses a symlink that points outside the tree. It writes an
+//! `.almanac-origin` stamp into the vendored directory, so the managed
+//! set is explicit.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -34,7 +36,7 @@ impl std::fmt::Display for VendorError {
     }
 }
 
-/// A source's git URL, or the local dir for dev sources.
+/// A source's git URL, or the local directory of a dev source.
 pub enum Located {
     Git { url: String },
     Dev { dir: PathBuf },
@@ -83,8 +85,9 @@ fn git(dir: &Path, args: &[&str]) -> Result<String, VendorError> {
     }
 }
 
-/// Fetch `rev` from `url` into a temp checkout. Returns (checkout dir,
-/// fetch path taken). The temp dir must outlive use of the path.
+/// Fetch `rev` from `url` into a temporary checkout. Returns the
+/// checkout directory and the name of the fetch path that worked. The
+/// temporary directory must outlive every use of that path.
 pub fn fetch_rev(
     url: &str,
     rev: &str,
@@ -109,8 +112,8 @@ pub fn fetch_rev(
     Ok((tmp, "full-fetch"))
 }
 
-/// Resolve a ref (or the remote HEAD) to a commit sha. Hard error when
-/// nothing resolves — never proceed against an unknown base.
+/// Resolve a ref, or the remote HEAD, to a commit sha. Returns an error
+/// when nothing resolves. Almanac never works from an unknown base.
 pub fn resolve_remote(url: &str, r#ref: Option<&str>) -> Result<(String, String), VendorError> {
     let tmp = tempdir::create("almanac-resolve")?;
     if let Some(r) = r#ref {
@@ -136,9 +139,11 @@ pub fn resolve_remote(url: &str, r#ref: Option<&str>) -> Result<(String, String)
     Ok((sha, branch))
 }
 
-/// Copy a skill tree into the library, deny-list honored, escaping
-/// symlinks refused (`hash_tree` already validates; copy re-checks
-/// nothing and simply skips symlinks whose targets it copied as links).
+/// Copy a skill tree into the library.
+///
+/// The copy honors the deny-list and recreates a symlink as a symlink.
+/// It does not re-check the symlink targets, because `hash_tree` runs
+/// first and refuses a symlink that points outside the tree.
 pub fn copy_tree(src: &Path, dst: &Path) -> Result<(), VendorError> {
     std::fs::create_dir_all(dst).map_err(|e| VendorError::Io(e.to_string()))?;
     let entries = std::fs::read_dir(src).map_err(|e| VendorError::Io(e.to_string()))?;
@@ -163,8 +168,8 @@ pub fn copy_tree(src: &Path, dst: &Path) -> Result<(), VendorError> {
     Ok(())
 }
 
-/// Vendor a validated skill tree into `library/<name>`: hash, copy,
-/// stamp. Returns the content hash.
+/// Vendor a validated skill tree into `library/<name>`. Hashes the
+/// tree, copies it, then stamps it. Returns the content hash.
 pub fn vendor(skill_src: &Path, library: &Path, entry: &Entry) -> Result<String, VendorError> {
     let hash = hash_tree(skill_src).map_err(VendorError::Hash)?;
     let dst = library.join(&entry.name);
@@ -191,8 +196,8 @@ pub fn is_managed(dir: &Path) -> bool {
     dir.join(ORIGIN_STAMP).is_file()
 }
 
-/// Minimal temp-dir handling (no external dep): unique dir under the
-/// system temp root, removed on drop.
+/// Minimal temporary directories, with no external dependency. Each one
+/// is a unique directory under the system temp root. Drop removes it.
 pub mod tempdir {
     use super::VendorError;
     use std::path::PathBuf;

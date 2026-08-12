@@ -1,18 +1,20 @@
-//! The almanac manifest: `almanac.yml`, adjacent to the library dir it
-//! governs.
+//! The almanac manifest: `almanac.yml`, next to the library directory
+//! it governs.
 //!
-//! The manifest plus vendored content is the reproducible
-//! record; a caveat the docs carry explicitly is that both live in the
-//! same repo, so the manifest binds content against upstream drift and
-//! accident — not against a compromised library repo itself.
+//! The manifest and the vendored content together are the reproducible
+//! record. Both live in the same repo, so the manifest binds the
+//! content against upstream drift and accident. It does not protect
+//! against a compromised library repo. The docs state this limit
+//! plainly.
 
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
 pub const MANIFEST_NAME: &str = "almanac.yml";
-/// Stamp file written inside every vendored dir; the managed-set marker.
-/// Excluded from hashing. remove/prune refuse dirs without it.
+/// Stamp file that almanac writes inside every vendored directory. It
+/// marks the directory as managed. The hash excludes it. `remove`
+/// refuses a directory without it.
 pub const ORIGIN_STAMP: &str = ".almanac-origin";
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -25,18 +27,20 @@ pub struct Manifest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Entry {
-    /// Owns the vendor directory name and CLI addressing. Must match the
-    /// SKILL.md frontmatter name (mismatch is refused at add).
+    /// Names the vendored directory, and addresses the entry on the CLI.
+    /// It must match the SKILL.md frontmatter name. `add` refuses a
+    /// mismatch.
     pub name: String,
     /// `github:owner/repo`, `git:<url>`, or `dev:<path>`.
     pub source: String,
     /// Skill directory within the source (git sources).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
-    /// Branch or tag the pin came from (git sources); update resolves it.
+    /// Branch or tag that the pin came from (git sources). `update`
+    /// resolves it again.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#ref: Option<String>,
-    /// Full commit sha (git sources). Absent for dev: snapshots.
+    /// Full commit sha (git sources). Absent for a dev: snapshot.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rev: Option<String>,
     /// `sha256-v1:` content hash of the vendored tree.
@@ -44,8 +48,9 @@ pub struct Entry {
 }
 
 impl Entry {
-    /// `dev:` entries are snapshots outside the reproducibility
-    /// contract: excluded from `sync --check`, drift is info not failure.
+    /// A `dev:` entry is a snapshot outside the reproducibility
+    /// contract. `sync --check` skips it, and it reports drift as
+    /// information, not as a failure.
     #[must_use]
     pub fn is_dev(&self) -> bool {
         self.source.starts_with("dev:")

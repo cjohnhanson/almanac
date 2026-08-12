@@ -10,21 +10,112 @@ type: reference
 almanac <command>
 ```
 
-Agent skill aggregator — index and retrieve skills from pluggable sources.
+Almanac curates agent skills and indexes them for agents to read.
 
 ## Global Options
 
-`--root <path>` — Project root directory. Defaults to `.` (current directory). Applies to all subcommands.
+`--root <path>` — Project root directory. Defaults to `.`, the current
+directory. Applies to every subcommand.
 
-`--version` — Print version and exit.
+`--version` — Print the version and exit.
 
-`--help` — Print help and exit.
+`--help` — Print the help and exit.
 
-## Commands
+## Library commands
+
+These commands read and write `almanac.yml`. Read `almanac docs
+curation` for the manifest workflow and the trust model.
+
+### `almanac init`
+
+Create an `almanac.yml` manifest that governs a library directory.
+
+```
+almanac init [--library <dir>]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--library <dir>` | Library directory, relative to the manifest. Defaults to `skills` |
+
+### `almanac add <source>`
+
+Fetch a skill, print its red-flag report, and vendor it with
+`--accept`.
+
+```
+almanac add <source> [--name <name>] [--path <dir>] [--ref <ref>] [--rev <sha>] [--accept]
+```
+
+| Argument/Option | Description |
+|-----------------|-------------|
+| `<source>` | `github:owner/repo`, `owner/repo`, `git:<url>`, or `dev:<path>` |
+| `--name <name>` | Manifest name. Must match the SKILL.md frontmatter name |
+| `--path <dir>` | Skill directory within the source |
+| `--ref <ref>` | Branch or tag to resolve |
+| `--rev <sha>` | Exact commit to pin |
+| `--accept` | Accept the staged content into the library |
+
+Without `--accept`, almanac stages the skill, prints the report, and
+exits 1. Nothing lands in the library.
+
+### `almanac sync`
+
+Write every pinned entry to disk.
+
+```
+almanac sync [--check]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--check` | Verify instead of writing. Exits 1 when a pinned entry drifts |
+
+Each entry prints one line: `ok`, `skip` for a `dev:` snapshot, or
+`FAIL`.
+
+### `almanac update [names...]`
+
+Fetch upstream, print the red flags and the diff, and re-pin with
+`--yes`.
+
+```
+almanac update [names...] [--yes]
+```
+
+| Argument/Option | Short | Description |
+|-----------------|-------|-------------|
+| `[names...]` | | Entry names. Defaults to every git-sourced entry |
+| `--yes` | `-y` | Apply the update and re-pin |
+
+Without `--yes`, almanac prints the report and changes nothing.
+
+### `almanac remove <name>`
+
+Remove an entry and its vendored directory.
+
+```
+almanac remove <name>
+```
+
+Almanac refuses to delete a directory without an `.almanac-origin`
+stamp.
+
+### `almanac status`
+
+List every manifest entry with its pin, its drift state, and its
+source. The drift state is `clean`, `drifted`, or `missing`. Unmanaged
+neighbor directories follow, marked `unmanaged`.
+
+```
+almanac status
+```
+
+## Index commands
 
 ### `almanac list`
 
-List all available skills with name, description, and source type.
+List the available skills with name, description, and source type.
 
 ```
 almanac list [--source <path>]
@@ -32,13 +123,15 @@ almanac list [--source <path>]
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--source <path>` | `-s` | Skill source directory. Repeatable — each adds another source |
+| `--source <path>` | `-s` | Skill source directory. Repeatable. Each flag adds one source |
 
-Output columns: `NAME`, `DESCRIPTION`, `[SOURCE_TYPE]`. Skills come from path sources (`file`); nothing is compiled into the binary — the curated library (see `almanac docs curation`) is the primary source.
+Output columns: `NAME`, `DESCRIPTION`, `[SOURCE_TYPE]`. Skills come
+from path sources (`file`). Nothing is compiled into the binary. The
+curated library is the main source. Read `almanac docs curation`.
 
 ### `almanac show <name>`
 
-Print the full SKILL.md content for a named skill.
+Print the full SKILL.md content of one skill.
 
 ```
 almanac show <name> [--source <path>]
@@ -46,39 +139,47 @@ almanac show <name> [--source <path>]
 
 | Argument/Option | Short | Description |
 |-----------------|-------|-------------|
-| `<name>` | | Skill name to display |
+| `<name>` | | Skill name to print |
 | `--source <path>` | `-s` | Skill source directory. Repeatable |
 
-Prints the raw SKILL.md content to stdout. Exits with an error if the skill is not found.
+Almanac prints the raw SKILL.md content to stdout. It exits with an
+error when the skill is not found.
 
 ### `almanac index`
 
-Print a machine-readable JSON index of all available skills.
+Print a JSON index of the available skills.
 
 ```
-almanac index [--source <path>]
+almanac index [--source <path>] [--md] [--max-bytes <n>]
 ```
 
 | Option | Short | Description |
 |--------|-------|-------------|
 | `--source <path>` | `-s` | Skill source directory. Repeatable |
+| `--md` | | Print a markdown index of the library instead. Reads `almanac.yml` |
+| `--max-bytes <n>` | | Byte budget for `--md`. Defaults to 4096 |
 
-Output is a JSON array of skill objects, each containing `name`, `description`, and source metadata.
+The JSON output is an array of skill objects. Each object holds `name`,
+`description`, and source metadata.
+
+Under the `--md` budget the output degrades in steps: full lines first,
+then names only, then a truncation note.
 
 ### `almanac docs`
 
-Browse bundled almanac documentation.
+Read the bundled almanac documentation.
 
 ```
-almanac docs                    List available docs (shows slugs)
+almanac docs                    List the available docs and their slugs
 almanac docs list               Same as bare `almanac docs`
-almanac docs <identifier>       Print a doc by slug, title, or unique prefix
-almanac docs search <query>     Search across all docs
+almanac docs <identifier>       Print one doc by slug, title, or unique prefix
+almanac docs search <query>     Search every doc
 ```
 
 ## Mounted via clc
 
-When used through clc, sources come from `clc.yml` under the `skills:` key:
+When you use almanac through clc, the sources come from `clc.yml` under
+the `skills:` key:
 
 ```yaml
 skills:
@@ -86,4 +187,6 @@ skills:
   - path: ~/Projects/co.d/skills/
 ```
 
-Subcommands are available as `clc almanac list`, `clc almanac show <name>`, etc. Sources from `clc.yml` are merged with any `--source` flags passed on the command line.
+The subcommands become `clc almanac list`, `clc almanac show <name>`,
+and so on. Almanac merges the sources from `clc.yml` with any
+`--source` flags from the command line.

@@ -6,31 +6,41 @@ type: explanation
 
 # What is Almanac?
 
-Almanac indexes agent skills from multiple sources so agents can search
-and load them. A skill is a directory with a SKILL.md file: YAML
-frontmatter declares name and description, the body holds instructions.
+Almanac indexes agent skills so agents can find them and load them. A
+skill is a directory with a SKILL.md file. The YAML frontmatter
+declares a name and a description. The body holds the instructions.
 
 Almanac implements the agentskills.io specification for SKILL.md
-parsing and frontmatter. At session start, agents see a list of skill
-names and descriptions. Full content is loaded on demand via `almanac
-show <name>`.
+parsing and frontmatter. An agent reads the list of names and
+descriptions at session start. It loads the full content later with
+`almanac show <name>`.
 
-## Skill sources
+## Where skills come from
 
-Almanac reads skills from three kinds of sources:
+Almanac reads skills from directories on disk. The main directory is
+the curated library that `almanac.yml` governs. Read `almanac docs
+curation` for the manifest workflow.
 
-- **Local paths** — directories on disk containing skill subdirectories
-- **Git repos** — remote repositories cloned and cached locally (planned)
-- **Built-in** — skills compiled into the almanac binary
+Add more directories with `--source`. Each `--source` flag adds one
+directory. Nothing is compiled into the binary.
 
-Sources are configured in `clc.yml` under the `skills:` key, or passed via
-`--source` flags on the command line.
+Almanac vendors skills into the library from three kinds of source:
+
+- `github:owner/repo` — a GitHub repository, pinned to a commit and a
+  content hash
+- `git:<url>` — any git server, pinned the same way
+- `dev:<path>` — a local snapshot of a skill you develop alongside
 
 ## How agents use it
 
-clc injects the skill index into agent context at session start.
-Agents load full skill content via `almanac show <name>` or by reading
-the SKILL.md file directly.
+Print a markdown index and inject it into agent context at session
+start:
+
+    almanac index --md --max-bytes 4096
+
+The agent then loads one skill with `almanac show <name>`, or it reads
+the SKILL.md file directly. When clc mounts almanac, clc injects the
+index and passes the source directories from `clc.yml`.
 
 ## SKILL.md format
 
@@ -38,11 +48,11 @@ Each skill lives in its own directory with a `SKILL.md` entry point:
 
 ```
 my-skill/
-├── SKILL.md           # Required — instructions with YAML frontmatter
-└── ...                # Supporting files (read by the agent on demand)
+├── SKILL.md           # Required. Instructions with YAML frontmatter.
+└── ...                # Supporting files. The agent reads them on demand.
 ```
 
-Frontmatter requires `name` and `description` per the agentskills.io spec.
-The `name` field must be lowercase alphanumeric with hyphens, match the
-directory name, and be at most 64 characters. If `name` is omitted, almanac
-falls back to the directory name.
+The agentskills.io spec requires `name` and `description` in the
+frontmatter. The `name` must use lowercase letters, digits, and
+hyphens. It must match the directory name. It must be 64 characters or
+shorter. Almanac uses the directory name when `name` is absent.

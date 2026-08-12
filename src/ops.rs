@@ -1,9 +1,10 @@
 //! Manifest operations: init, add, sync, update, list, remove, index-md.
 //!
-//! The trust posture, stated plainly: `add` is trust-on-first-use — the
-//! red-flag report and the staged tree are shown, and nothing lands
-//! without `--accept`. After that, content is pinned and every change
-//! arrives through a diff-gated `update`. Nothing changes silently.
+//! The trust model, stated plainly: `add` trusts a source on first use.
+//! It shows the red-flag report and the staged tree, and nothing lands
+//! without `--accept`. Almanac then pins the content, and every later
+//! change arrives through an `update` that shows a diff first. No
+//! change lands without a report.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -85,7 +86,7 @@ pub fn add(dir: &Path, source: &str, opts: &AddOpts) -> Result<(), Error> {
             };
             if !skill_src.join("SKILL.md").is_file() {
                 return Err(Error::General(format!(
-                    "no SKILL.md at {} (use --path to point at the skill dir)",
+                    "no SKILL.md at {} (use --path to name the skill directory)",
                     skill_src.display()
                 )));
             }
@@ -103,13 +104,14 @@ pub fn add(dir: &Path, source: &str, opts: &AddOpts) -> Result<(), Error> {
         }
     };
 
-    // Names: frontmatter is authoritative for agents; the manifest name
-    // must agree. A mismatch is refused, not warned about forever.
+    // Agents read the frontmatter name, so it is authoritative. The
+    // manifest name must match it. Almanac refuses a mismatch here
+    // instead of warning about it forever.
     let fm_name = skill_md_name(&skill_src)?;
     let name = opts.name.clone().unwrap_or_else(|| fm_name.clone());
     if name != fm_name {
         return Err(Error::General(format!(
-            "manifest name `{name}` != SKILL.md name `{fm_name}` — they must match"
+            "manifest name `{name}` does not match SKILL.md name `{fm_name}`"
         )));
     }
     if manifest.entry(&name).is_some() {
@@ -124,7 +126,7 @@ pub fn add(dir: &Path, source: &str, opts: &AddOpts) -> Result<(), Error> {
 
     if !opts.accept {
         println!(
-            "staged only — inspect {} and re-run with --accept",
+            "staged only; inspect {} and run again with --accept",
             skill_src.display()
         );
         return Err(Error::General("not accepted".into()));
@@ -169,7 +171,7 @@ pub fn sync(dir: &Path, check: bool) -> Result<(), Error> {
         if check {
             if entry.is_dev() {
                 println!(
-                    "skip  {} (dev snapshot, outside the check contract)",
+                    "skip  {} (dev snapshot; outside the check contract)",
                     entry.name
                 );
             } else if state == "clean" {
@@ -181,12 +183,12 @@ pub fn sync(dir: &Path, check: bool) -> Result<(), Error> {
             continue;
         }
 
-        // Materialize.
+        // Write the entry to disk.
         if state == "clean" {
             println!("ok    {}", entry.name);
         } else if entry.is_dev() {
             println!(
-                "skip  {} (dev snapshot {state}; re-add from its source to refresh)",
+                "skip  {} (dev snapshot {state}; add it again from its source to refresh)",
                 entry.name
             );
         } else {
@@ -207,7 +209,7 @@ pub fn sync(dir: &Path, check: bool) -> Result<(), Error> {
                 println!("synced {} (via {how})", entry.name);
             } else {
                 println!(
-                    "FAIL  {} (fetched content does not match pinned hash)",
+                    "FAIL  {} (fetched content does not match the pinned hash)",
                     entry.name
                 );
                 failures += 1;
@@ -240,7 +242,10 @@ pub fn update(dir: &Path, names: &[String], yes: bool) -> Result<(), Error> {
 
     for entry in selected {
         if entry.is_dev() {
-            println!("skip  {} (dev snapshot; re-add to refresh)", entry.name);
+            println!(
+                "skip  {} (dev snapshot; add it again to refresh)",
+                entry.name
+            );
             continue;
         }
         let url = source_url(&entry.source)?;
@@ -280,7 +285,7 @@ pub fn update(dir: &Path, names: &[String], yes: bool) -> Result<(), Error> {
             manifest.save(dir)?;
             println!("updated {}", entry.name);
         } else {
-            println!("not applied — re-run with --yes to accept");
+            println!("not applied; run again with --yes to accept");
         }
     }
     Ok(())
@@ -295,7 +300,7 @@ pub fn remove(dir: &Path, name: &str) -> Result<(), Error> {
     if vendored.exists() {
         if !vendor::is_managed(&vendored) {
             return Err(Error::General(format!(
-                "{} has no {ORIGIN_STAMP} stamp — refusing to delete an unmanaged directory",
+                "{} has no {ORIGIN_STAMP} stamp; almanac does not delete an unmanaged directory",
                 vendored.display()
             )));
         }
@@ -329,7 +334,7 @@ pub fn list(dir: &Path) -> Result<(), Error> {
             entry.name, rev, state, entry.source
         );
     }
-    // Unmanaged co-tenants: reported, never touched.
+    // Unmanaged neighbors: almanac lists them and never touches them.
     if let Ok(entries) = std::fs::read_dir(&library) {
         let mut unmanaged: Vec<String> = entries
             .filter_map(Result::ok)
@@ -346,9 +351,11 @@ pub fn list(dir: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-/// Markdown skills index for context injection (a gaff prime section).
-/// Degrades under the byte budget: full lines while they fit, then
-/// name-only lines, then a truncation note — never a silent cut.
+/// Markdown skills index for context injection, as a gaff prime section.
+///
+/// The output degrades in steps under the byte budget: full lines while
+/// they fit, then name-only lines, then a truncation note. Almanac
+/// never cuts the list without a note.
 pub fn index_md(dir: &Path, max_bytes: usize) -> Result<String, Error> {
     let manifest = Manifest::load(dir)?;
     let library = manifest.library_dir(dir);
@@ -363,7 +370,7 @@ pub fn index_md(dir: &Path, max_bytes: usize) -> Result<String, Error> {
     for e in &entries {
         let full = format!("- **{}** — {}\n", e.name, e.description);
         let short = format!("- {}\n", e.name);
-        let note_room = 40; // reserve for the truncation note
+        let note_room = 40; // room kept for the truncation note
         if out.len() + full.len() + note_room <= max_bytes {
             out.push_str(&full);
         } else if out.len() + short.len() + note_room <= max_bytes {
@@ -409,8 +416,8 @@ fn print_flags(name: &str, flags: &[flags::Flag]) {
     }
 }
 
-/// `git diff --no-index` exits 1 when trees differ — that is the normal
-/// case here, not an error.
+/// `git diff --no-index` exits 1 when the trees differ. That is the
+/// normal case here, not an error.
 fn show_diff(old: &Path, new: &Path) {
     let out = Command::new("git")
         .args(["diff", "--no-index", "--stat", "--"])
