@@ -46,11 +46,35 @@ pub struct AddOpts {
     pub accept: bool,
 }
 
+/// The path a user should inspect for a staged-but-unaccepted skill.
+///
+/// A git source lives in a temp directory that drops when add returns,
+/// so the tree is copied to a persistent `.almanac-staged/<name>/`
+/// directory and that path is returned. A dev source is already a stable
+/// directory the user owns, so its own path is returned.
+fn staged_inspect_path(
+    dir: &Path,
+    name: &str,
+    skill_src: &Path,
+    is_temp: bool,
+) -> Result<PathBuf, Error> {
+    if !is_temp {
+        return Ok(skill_src.to_path_buf());
+    }
+    let staged = dir.join(".almanac-staged").join(name);
+    std::fs::remove_dir_all(&staged).ok();
+    if let Some(parent) = staged.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    vendor::copy_tree(skill_src, &staged)?;
+    Ok(staged)
+}
+
 pub fn add(dir: &Path, source: &str, opts: &AddOpts) -> Result<(), Error> {
     let mut manifest = Manifest::load(dir)?;
 
     // Stage the skill tree.
-    let (_tmp, skill_src, resolved_source, rev, r#ref): (
+    let (tmp_dir, skill_src, resolved_source, rev, r#ref): (
         Option<vendor::tempdir::TempDirHandle>,
         PathBuf,
         String,
@@ -125,9 +149,10 @@ pub fn add(dir: &Path, source: &str, opts: &AddOpts) -> Result<(), Error> {
     print_flags(&name, &flags);
 
     if !opts.accept {
+        let shown = staged_inspect_path(dir, &name, &skill_src, tmp_dir.is_some())?;
         println!(
             "staged only; inspect {} and run again with --accept",
-            skill_src.display()
+            shown.display()
         );
         return Err(Error::General("not accepted".into()));
     }
@@ -204,12 +229,17 @@ pub fn sync(dir: &Path, check: bool) -> Result<(), Error> {
             } else {
                 tmp.path.join(&sub)
             };
-            let hash = vendor::vendor(&src, &library, entry)?;
-            if hash == entry.sha256 {
+            // Verify the fetched content against the pin BEFORE it
+            // touches the library. vendor removes the existing directory,
+            // so writing first would destroy the good content when a pin
+            // no longer matches upstream.
+            let fetched = hash_tree(&src).map_err(|e| Error::General(e.to_string()))?;
+            if fetched == entry.sha256 {
+                vendor::vendor(&src, &library, entry)?;
                 println!("synced {} (via {how})", entry.name);
             } else {
                 println!(
-                    "FAIL  {} (fetched content does not match the pinned hash)",
+                    "FAIL  {} (fetched content does not match the pinned hash; library left as is)",
                     entry.name
                 );
                 failures += 1;
@@ -370,7 +400,7 @@ pub fn index_md(dir: &Path, max_bytes: usize) -> Result<String, Error> {
 
 /// The markdown index over explicit path sources. This needs no
 /// manifest, so a plain skill directory can feed a gaff section.
-#[must_use] 
+#[must_use]
 pub fn index_md_sources(dir: &Path, sources: &[SkillSource], max_bytes: usize) -> String {
     format_index_md(&skill::index(dir, sources), max_bytes)
 }
