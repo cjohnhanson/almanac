@@ -97,8 +97,12 @@ fn inspect_file(p: &Path, rp: &str, root: &Path, flags: &mut Vec<Flag>) {
     };
 
     if rp == "SKILL.md" {
-        let fm_end = text.find("\n---\n").unwrap_or(0);
-        let frontmatter = &text[..fm_end];
+        // Normalize CR/LF first. A CRLF file has `\r\n---\r\n`, so a
+        // search for `\n---\n` misses the fence, leaves the frontmatter
+        // empty, and the scan misses tool-granting keys.
+        let normalized = text.replace("\r\n", "\n");
+        let fm_end = normalized.find("\n---\n").unwrap_or(normalized.len());
+        let frontmatter = &normalized[..fm_end];
         for key in TOOL_KEYS {
             if frontmatter.contains(&format!("{key}:")) {
                 push(&format!("frontmatter controls agent behavior: `{key}`"));
@@ -159,6 +163,22 @@ mod tests {
         std::fs::create_dir_all(d.join("references")).unwrap();
         std::fs::write(d.join("references/guide.md"), "More.\n").unwrap();
         assert!(scan(&d).is_empty(), "{:?}", scan(&d));
+    }
+
+    #[test]
+    fn crlf_frontmatter_is_scanned() {
+        // A CRLF SKILL.md must not hide tool-granting frontmatter.
+        let d = tree("crlf");
+        std::fs::write(
+            d.join("SKILL.md"),
+            "---\r\nname: x\r\nallowed-tools: Bash\r\n---\r\nbody\r\n",
+        )
+        .unwrap();
+        let whats: Vec<String> = scan(&d).into_iter().map(|f| f.what).collect();
+        assert!(
+            whats.iter().any(|w| w.contains("allowed-tools")),
+            "CRLF frontmatter scanned: {whats:?}"
+        );
     }
 
     #[test]
