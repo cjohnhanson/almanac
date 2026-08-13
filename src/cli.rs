@@ -133,7 +133,12 @@ pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Re
             max_bytes,
         } => {
             if md {
-                print!("{}", crate::ops::index_md(root, max_bytes)?);
+                if extra_sources.is_empty() {
+                    print!("{}", crate::ops::index_md(root, max_bytes)?);
+                } else {
+                    let all_sources = merge_sources(sources, &extra_sources);
+                    print!("{}", crate::ops::index_md_sources(root, &all_sources, max_bytes));
+                }
             } else {
                 let all_sources = merge_sources(sources, &extra_sources);
                 cmd_index(root, &all_sources);

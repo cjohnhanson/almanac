@@ -365,9 +365,20 @@ pub fn index_md(dir: &Path, max_bytes: usize) -> Result<String, Error> {
             path: library.to_string_lossy().into_owned(),
         }],
     );
+    Ok(format_index_md(&entries, max_bytes))
+}
+
+/// The markdown index over explicit path sources. This needs no
+/// manifest, so a plain skill directory can feed a gaff section.
+#[must_use] 
+pub fn index_md_sources(dir: &Path, sources: &[SkillSource], max_bytes: usize) -> String {
+    format_index_md(&skill::index(dir, sources), max_bytes)
+}
+
+fn format_index_md(entries: &[skill::SkillEntry], max_bytes: usize) -> String {
     let mut out = String::from("Available skills (show with `almanac show <name>`):\n");
     let mut omitted = 0usize;
-    for e in &entries {
+    for e in entries {
         let full = format!("- **{}** — {}\n", e.name, e.description);
         let short = format!("- {}\n", e.name);
         let note_room = 40; // room kept for the truncation note
@@ -383,7 +394,7 @@ pub fn index_md(dir: &Path, max_bytes: usize) -> Result<String, Error> {
         use std::fmt::Write as _;
         let _ = writeln!(out, "…and {omitted} more (truncated)");
     }
-    Ok(out)
+    out
 }
 
 fn source_url(source: &str) -> Result<String, Error> {
