@@ -1,0 +1,5 @@
+library: skills
+skills:
+- name: tisket-tips
+  source: dev:local-skills/tisket-tips
+  sha256: sha256-v1:0f63ade2e2c6919594896dcba882baa7f28eb4abecb48f809c52286995c1e8ac

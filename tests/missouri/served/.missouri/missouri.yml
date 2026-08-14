@@ -1,0 +1,52 @@
+doc: |
+  The same library, read through a server. A scripted JSON-RPC session
+  over stdio drives it. The skills extension is the point: a client
+  gets each skill's frontmatter as written and a digest for each file.
+
+assertions:
+  # What the server declares
+  - name: "the skills extension is declared by identifier"
+    command: "mcp 'almanac serve' | jq -e 'select(.id==1) | .result.capabilities.extensions | has(\"io.modelcontextprotocol/skills\")'"
+  - name: "tools are on beside it, as the guaranteed surface"
+    command: "mcp 'almanac serve' | jq -e 'select(.id==1) | .result.capabilities | has(\"tools\")'"
+  - name: "resources are off unless asked for"
+    command: "mcp 'almanac serve' | jq -e 'select(.id==1) | .result.capabilities | has(\"resources\") | not'"
+  - name: "asking for resources turns them on"
+    command: "mcp 'almanac serve --surfaces resources,tools' | jq -e 'select(.id==1) | .result.capabilities | has(\"resources\")'"
+  - name: "asking for tools alone drops the extension"
+    command: "mcp 'almanac serve --surfaces tools' | jq -e 'select(.id==1) | .result.capabilities | has(\"extensions\") | not'"
+
+  # The skills extension
+  - name: "skills/list returns the library's skills"
+    command: "mcp 'almanac serve' '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"skills/list\"}' | jq -e 'select(.id==2) | .result.skills | length >= 1'"
+  - name: "each skill carries frontmatter as written"
+    command: "mcp 'almanac serve' '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"skills/list\"}' | jq -r 'select(.id==2) | .result.skills[0].frontmatter' | grep -q 'name:'"
+  - name: "each file carries its own sha256 digest"
+    command: "mcp 'almanac serve' '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"skills/list\"}' | jq -e 'select(.id==2) | .result.skills[0].resources | map(.digest | startswith(\"sha256:\")) | all'"
+  - name: "the digest matches the file on disk"
+    command: |
+      REPORTED=$(mcp 'almanac serve' '{"jsonrpc":"2.0","id":2,"method":"skills/list"}' | jq -r 'select(.id==2) | .result.skills[0].resources[0].digest')
+      ACTUAL="sha256:$(shasum -a 256 skills/tisket-tips/SKILL.md | cut -d' ' -f1)"
+      test "$REPORTED" = "$ACTUAL"
+  - name: "skills/get returns the same entry a listing gave"
+    command: |
+      URI=$(mcp 'almanac serve' '{"jsonrpc":"2.0","id":2,"method":"skills/list"}' | jq -r 'select(.id==2) | .result.skills[0].uri')
+      mcp 'almanac serve' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"skills/get\",\"params\":{\"uri\":\"$URI\"}}" | jq -e "select(.id==3) | .result.skill.uri == \"$URI\""
+  - name: "skills/get refuses a URI that names nothing"
+    command: "mcp 'almanac serve' '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"skills/get\",\"params\":{\"uri\":\"skill://nosuch/SKILL.md\"}}' | jq -e 'select(.id==2) | has(\"error\")'"
+  - name: "the extension is refused when it is not served"
+    command: "mcp 'almanac serve --surfaces tools' '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"skills/list\"}' | jq -e 'select(.id==2) | has(\"error\")'"
+
+  # The tool surface returns the same content
+  - name: "the tools are listed"
+    command: "mcp 'almanac serve' '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}' | jq -e 'select(.id==2) | [.result.tools[].name] | index(\"almanac_get_skill\")'"
+  - name: "a tool returns the skill body"
+    command: "mcp 'almanac serve' '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"almanac_get_skill\",\"arguments\":{\"name\":\"tisket-tips\"}}}' | jq -r 'select(.id==2) | .result.content[0].text' | grep -q 'name: tisket-tips'"
+  - name: "check answers through the server"
+    command: "mcp 'almanac serve' '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"almanac_check\",\"arguments\":{}}}' | jq -r 'select(.id==2) | .result.content[0].text' | grep -q 'no problems found'"
+
+  # A served library is read-only, and accepting a skill is never served
+  - name: "no tool vendors or accepts a skill, in any access mode"
+    command: "mcp 'almanac serve --access read-write' '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}' | jq -e 'select(.id==2) | [.result.tools[].name] | map(test(\"add|accept|remove|sync\")) | any | not'"
+  - name: "the library is unchanged after being served"
+    command: "almanac sync --check"
