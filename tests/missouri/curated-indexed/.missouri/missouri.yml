@@ -1,1 +1,35 @@
-doc: "Terminal: index --md reads state, writes nothing."
+doc: |
+  Terminal: index --md reads state and writes nothing. The markdown
+  index is what an agent reads at session start, so its shape and its
+  size limit are part of the contract.
+
+assertions:
+  - name: "the markdown index names each skill"
+    command: "almanac index --md | grep -q 'tisket-tips'"
+  - name: "the markdown index carries the descriptions"
+    command: "test $(almanac index --md | grep -c 'tisket-tips') -ge 1"
+  # The budget bounds the entries, not the whole document: the header
+  # and the truncation notice are always printed, so a budget below
+  # their combined size cannot be met. This pins that floor, so a
+  # change to it is a deliberate one.
+  - name: "a small budget drops the entries and says so"
+    command: "almanac index --md --max-bytes 64 | grep -q 'truncated'"
+  - name: "a small budget prints no skill name"
+    command: "almanac index --md --max-bytes 64 | grep -q 'tisket-tips'"
+    should_fail: true
+  - name: "the floor is the header plus the notice"
+    command: "test $(almanac index --md --max-bytes 1 | wc -c) -eq $(almanac index --md --max-bytes 64 | wc -c)"
+  - name: "a generous limit does not truncate it"
+    command: "test $(almanac index --md --max-bytes 100000 | wc -c) -eq $(almanac index --md | wc -c)"
+  - name: "and prints no truncation notice"
+    command: "almanac index --md --max-bytes 100000 | grep -q 'truncated'"
+    should_fail: true
+  - name: "the JSON index parses"
+    command: "almanac index | jq -e 'type == \"array\"'"
+  - name: "every entry has a name, a description, and a source"
+    command: "almanac index | jq -e 'all(has(\"name\") and has(\"description\") and has(\"source\"))'"
+  - name: "reading the index does not change the library"
+    command: "almanac index --md >/dev/null && almanac index >/dev/null && almanac sync --check"
+  - name: "status stays clean after the reads"
+    command: "almanac status | grep -q 'drifted'"
+    should_fail: true

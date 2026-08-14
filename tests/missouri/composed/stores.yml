@@ -1,0 +1,4 @@
+format: 2
+stores:
+  - alias: shared
+    path: ./shared
