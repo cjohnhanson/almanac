@@ -1,6 +1,7 @@
 pub mod cli;
 pub mod flags;
 pub mod hash;
+pub mod mangen;
 pub mod manifest;
 pub mod ops;
 pub mod vendor;

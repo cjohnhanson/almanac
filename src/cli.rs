@@ -25,6 +25,20 @@ pub struct Args {
 
 #[derive(Parser)]
 pub enum Command {
+    /// Write the man pages into a directory (the package build uses this)
+    #[command(hide = true)]
+    GenMan {
+        /// Output directory for the section-1 pages
+        dir: std::path::PathBuf,
+    },
+
+    /// Print a shell completion script (the package build uses this)
+    #[command(hide = true)]
+    GenCompletions {
+        /// Target shell
+        shell: clap_complete::Shell,
+    },
+
     /// Create an almanac.yml manifest that governs a library directory.
     Init {
         /// Library directory, relative to the manifest.
@@ -105,10 +119,24 @@ pub enum Command {
     },
 }
 
-/// Run one CLI command. clc calls this when it mounts almanac as a
-/// subcommand.
+/// Run one CLI command. A host that mounts almanac as a subcommand
+/// calls this with its own sources.
 pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Result<(), Error> {
     match command {
+        Command::GenMan { dir } => {
+            use clap::CommandFactory as _;
+            std::fs::create_dir_all(&dir).map_err(|e| Error::General(e.to_string()))?;
+            crate::mangen::write_man_pages(&Args::command(), &dir)
+                .map_err(|e| Error::General(e.to_string()))?;
+            Ok(())
+        }
+
+        Command::GenCompletions { shell } => {
+            use clap::CommandFactory as _;
+            clap_complete::generate(shell, &mut Args::command(), "almanac", &mut std::io::stdout());
+            Ok(())
+        }
+
         Command::List {
             sources: extra_sources,
         } => {
@@ -137,7 +165,10 @@ pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Re
                     print!("{}", crate::ops::index_md(root, max_bytes)?);
                 } else {
                     let all_sources = merge_sources(sources, &extra_sources);
-                    print!("{}", crate::ops::index_md_sources(root, &all_sources, max_bytes));
+                    print!(
+                        "{}",
+                        crate::ops::index_md_sources(root, &all_sources, max_bytes)
+                    );
                 }
             } else {
                 let all_sources = merge_sources(sources, &extra_sources);
