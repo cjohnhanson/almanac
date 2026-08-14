@@ -7,6 +7,7 @@ pub mod mangen;
 pub mod manifest;
 pub mod ops;
 pub mod skill;
+pub mod serve;
 pub mod source;
 pub mod vendor;
 pub mod workspace;
