@@ -157,6 +157,17 @@ pub struct View<'a> {
     pub shadowed: bool,
 }
 
+/// One problem that `check` reports.
+#[derive(Debug, serde::Serialize)]
+pub struct Finding {
+    /// What holds the problem: a skill name, an alias, or a library.
+    pub subject: String,
+    /// What is wrong with it.
+    pub detail: String,
+    /// The class of problem, for a caller that groups them.
+    pub kind: String,
+}
+
 /// One library in the closure.
 #[derive(Debug, serde::Serialize)]
 pub struct StoreRow {
@@ -333,6 +344,55 @@ impl Workspace {
             ));
         }
         results
+    }
+
+    /// Every problem in the closure, as one list.
+    ///
+    /// This is the whole of `check`. Each interface presents the same
+    /// findings, so the CLI and a server cannot drift apart.
+    #[must_use]
+    pub fn check(&self, root: &Path) -> Vec<Finding> {
+        let mut findings = Vec::new();
+
+        // A requirement that names no skill.
+        for (skill, target) in self.dangling_requires() {
+            findings.push(Finding {
+                subject: skill,
+                detail: format!("requires {target}, which names no skill"),
+                kind: "requirement".to_string(),
+            });
+        }
+        // A name that two libraries hold. The nearer one wins, and the
+        // loser is invisible unless this says so.
+        for (name, winner, losers) in self.shadowed() {
+            findings.push(Finding {
+                subject: name,
+                detail: format!("comes from {winner}; also in {}", losers.join(", ")),
+                kind: "shadowed".to_string(),
+            });
+        }
+        for alias in self.missing() {
+            findings.push(Finding {
+                subject: alias,
+                detail: "is not available".to_string(),
+                kind: "unreachable library".to_string(),
+            });
+        }
+        for (alias, why) in self.unshareable(root) {
+            findings.push(Finding {
+                subject: alias,
+                detail: why,
+                kind: "declaration".to_string(),
+            });
+        }
+        for skipped in self.skipped() {
+            findings.push(Finding {
+                subject: "library".to_string(),
+                detail: format!("skipped {skipped}"),
+                kind: "scan".to_string(),
+            });
+        }
+        findings
     }
 
     /// The full text of a skill, from whichever library won its name.
