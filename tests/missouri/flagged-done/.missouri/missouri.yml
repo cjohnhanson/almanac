@@ -1,1 +1,31 @@
-doc: "Terminal: sketchy vendored with eyes open."
+doc: |
+  Terminal: a skill with red flags, vendored with eyes open. The accept
+  gate is a decision, not a filter: the flags are reported, and the
+  skill still lands when the user says so.
+
+assertions:
+  - name: "the flagged skill is vendored"
+    command: "test -f skills/sketchy/SKILL.md"
+  - name: "it carries its origin stamp"
+    command: "test -f skills/sketchy/.almanac-origin"
+  - name: "the manifest pins it like any other entry"
+    command: "grep -q 'name: sketchy' almanac.yml && grep -q 'sha256: sha256-v1:' almanac.yml"
+  - name: "status reports it as clean"
+    command: "almanac status | grep 'sketchy' | grep -q 'clean'"
+  - name: "the check passes"
+    command: "almanac sync --check"
+  - name: "the flagged content is intact, not sanitized"
+    command: "grep -q 'allowed-tools' skills/sketchy/SKILL.md"
+  - name: "list shows it beside any other skill"
+    command: "almanac list | grep -q 'sketchy'"
+  - name: "the index includes it"
+    command: "almanac index | jq -e 'any(.name == \"sketchy\")'"
+
+  # Removal
+  - name: "remove takes out the entry and the directory"
+    command: "almanac remove sketchy >/dev/null && test ! -d skills/sketchy"
+  - name: "the manifest no longer lists it"
+    command: "grep -q 'name: sketchy' almanac.yml"
+    should_fail: true
+  - name: "the library is empty and still consistent"
+    command: "almanac sync --check && almanac index | jq -e 'length == 0'"

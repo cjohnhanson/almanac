@@ -176,17 +176,29 @@ almanac docs <identifier>       Print one doc by slug, title, or unique prefix
 almanac docs search <query>     Search every doc
 ```
 
-## Mounted via clc
 
-When you use almanac through clc, the sources come from `clc.yml` under
-the `skills:` key:
+## `almanac store list`
 
-```yaml
-skills:
-  - path: ./skills/
-  - path: ~/Projects/co.d/skills/
-```
+List the libraries that this library reads, in precedence order. The
+first row is this library. Each other row shows a declared library, its
+source, and its skill count. A remote library also shows the age of its
+cache.
 
-The subcommands become `clc almanac list`, `clc almanac show <name>`,
-and so on. Almanac merges the sources from `clc.yml` with any
-`--source` flags from the command line.
+## `almanac store sync`
+
+Fetch each declared remote library into the local cache. This is the
+only command that reaches the network.
+
+## `almanac check`
+
+Report the problems that the declarations create:
+
+- A `requires:` entry names no skill.
+- Two libraries hold one skill name. The report gives the library that
+  wins and each library that loses.
+- A declared library is not available.
+- A file could not be read.
+- In a `shared: true` library, a clone cannot reach a declared library.
+
+The command exits non-zero when it finds any. Read `almanac docs
+composition` for the model.

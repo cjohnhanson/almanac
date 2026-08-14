@@ -24,6 +24,13 @@ curation` for the manifest workflow.
 Add more directories with `--source`. Each `--source` flag adds one
 directory. Nothing is compiled into the binary.
 
+A library can also declare other libraries in `stores.yml`, under local
+aliases. The nearer library wins a skill name: this library first, then
+each declared library in declaration order. A skill declares the skills
+it needs in a `requires:` frontmatter key, and an entry can name another
+library with `alias:name`. Read `almanac docs composition` for the
+model.
+
 Almanac vendors skills into the library from three kinds of source:
 
 - `github:owner/repo` — a GitHub repository, pinned to a commit and a
@@ -39,8 +46,9 @@ start:
     almanac index --md --max-bytes 4096
 
 The agent then loads one skill with `almanac show <name>`, or it reads
-the SKILL.md file directly. When clc mounts almanac, clc injects the
-index and passes the source directories from `clc.yml`.
+the SKILL.md file directly. A context-lifecycle tool such as
+[gaff](https://github.com/cjohnhanson/gaff) can inject the index into a
+session on a cadence.
 
 ## SKILL.md format
 

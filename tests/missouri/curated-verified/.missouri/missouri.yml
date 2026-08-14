@@ -1,1 +1,58 @@
-doc: "Terminal: tamper caught, then restored byte-identically."
+doc: |
+  Terminal: tamper caught, then restored byte-identically. A library
+  with one vendored dev-source skill, pinned by content hash.
+
+assertions:
+  # The manifest
+  - name: "the manifest pins the skill by content hash"
+    command: "grep -q 'sha256: sha256-v1:' almanac.yml"
+  - name: "the manifest names the library directory"
+    command: "grep -q '^library: skills$' almanac.yml"
+  - name: "the manifest records where the skill came from"
+    command: "grep -q 'source: dev:local-skills/tisket-tips' almanac.yml"
+
+  # The state on disk
+  - name: "the skill is vendored"
+    command: "test -f skills/tisket-tips/SKILL.md"
+  - name: "the vendored skill carries its origin stamp"
+    command: "test -f skills/tisket-tips/.almanac-origin"
+  - name: "the tamper left no stray file"
+    command: "test ! -f orig.md"
+
+  # What the commands report
+  - name: "status reports the skill as clean"
+    command: "almanac status | grep 'tisket-tips' | grep -q 'clean'"
+  - name: "the check passes"
+    command: "almanac sync --check"
+  - name: "list shows the skill"
+    command: "almanac list | grep -q 'tisket-tips'"
+  - name: "show prints the skill body"
+    command: "almanac show tisket-tips | grep -qi 'tisket'"
+  - name: "the index is valid JSON with one entry"
+    command: "almanac index | jq -e 'length == 1'"
+  - name: "the index entry carries a name and a description"
+    command: "almanac index | jq -e '.[0].name == \"tisket-tips\" and (.[0].description | length > 0)'"
+
+  # Failure paths
+  - name: "showing a skill that is not there fails"
+    command: "almanac show no-such-skill"
+    should_fail: true
+  - name: "removing an entry that is not in the manifest fails"
+    command: "almanac remove no-such-skill"
+    should_fail: true
+  - name: "a second init refuses to overwrite the manifest"
+    command: "almanac init"
+    should_fail: true
+
+  # A dev source is a snapshot of a skill you develop alongside, so an
+  # edit to it is expected work, not tampering. Status reports the
+  # drift, the check skips it, and sync leaves the edit alone. Only a
+  # pinned upstream source is restored.
+  - name: "an edit to a dev-source skill shows as drift"
+    command: "printf 'my edit\\n' >> skills/tisket-tips/SKILL.md && almanac status | grep 'tisket-tips' | grep -q 'drifted'"
+  - name: "the check still passes, and says it skipped the dev source"
+    command: "almanac sync --check 2>&1 | grep -q 'skip.*tisket-tips'"
+  - name: "sync does not discard the edit"
+    command: "almanac sync >/dev/null 2>&1; grep -q 'my edit' skills/tisket-tips/SKILL.md"
+  - name: "restoring the file by hand clears the drift"
+    command: "grep -v 'my edit' skills/tisket-tips/SKILL.md > /tmp/almanac-restore && mv /tmp/almanac-restore skills/tisket-tips/SKILL.md && almanac status | grep 'tisket-tips' | grep -q 'clean'"

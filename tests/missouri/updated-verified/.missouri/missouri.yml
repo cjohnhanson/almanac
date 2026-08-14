@@ -1,1 +1,28 @@
-doc: "Terminal: byte-identical to updated after tamper-and-restore."
+doc: |
+  Terminal: a git-source skill re-pinned to a newer upstream commit,
+  beside the dev-source skill that did not move.
+
+assertions:
+  - name: "both skills are vendored"
+    command: "test -f skills/tisket-tips/SKILL.md && test -f skills/remote-tips/SKILL.md"
+  - name: "the git entry records its revision"
+    command: "grep -A5 'name: remote-tips' almanac.yml | grep -q 'rev: '"
+  - name: "the git entry records its branch"
+    command: "grep -A5 'name: remote-tips' almanac.yml | grep -q 'ref: main'"
+  - name: "the git entry records the path inside the repository"
+    command: "grep -A5 'name: remote-tips' almanac.yml | grep -q 'path: remote-skill'"
+  - name: "the dev entry has no revision, because a path has none"
+    command: "grep -A3 'name: tisket-tips' almanac.yml | grep -q 'rev: '"
+    should_fail: true
+  - name: "the vendored content is the newer version"
+    command: "grep -q 'Version two' skills/remote-tips/SKILL.md"
+  - name: "status reports both as clean"
+    command: "test $(almanac status | grep -c 'clean') -ge 2"
+  - name: "the check passes"
+    command: "almanac sync --check"
+  - name: "the index holds both"
+    command: "almanac index | jq -e 'length == 2'"
+  - name: "show reads the updated body"
+    command: "almanac show remote-tips | grep -q 'Version two'"
+  - name: "each entry is pinned by content hash"
+    command: "test $(grep -c 'sha256: sha256-v1:' almanac.yml) -eq 2"

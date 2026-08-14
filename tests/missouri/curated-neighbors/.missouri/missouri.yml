@@ -1,1 +1,31 @@
-doc: "Terminal: the hand-made neighbor survives, unmanaged and intact."
+doc: |
+  Terminal: the hand-made neighbor survives, unmanaged and intact. A
+  library directory is not owned wholesale: a skill that almanac did not
+  vendor is reported, used, and never touched.
+
+assertions:
+  - name: "the unmanaged neighbor is still there"
+    command: "test -f skills/hand-made/SKILL.md"
+  - name: "it has no origin stamp, because almanac did not vendor it"
+    command: "test -f skills/hand-made/.almanac-origin"
+    should_fail: true
+  - name: "the manifest does not claim it"
+    command: "grep -q 'name: hand-made' almanac.yml"
+    should_fail: true
+  - name: "status reports it as unmanaged"
+    command: "almanac status | grep -q 'hand-made'"
+  - name: "the check passes with the neighbor present"
+    command: "almanac sync --check"
+  - name: "sync leaves the neighbor untouched"
+    command: "cp skills/hand-made/SKILL.md /tmp/almanac-neighbor-before && almanac sync >/dev/null && diff -q /tmp/almanac-neighbor-before skills/hand-made/SKILL.md"
+  - name: "list shows the neighbor beside the managed skill"
+    command: "almanac list | grep -q 'hand-made' && almanac list | grep -q 'tisket-tips'"
+  - name: "the index holds both"
+    command: "almanac index | jq -e 'length == 2'"
+  - name: "show reads the neighbor"
+    command: "almanac show hand-made | grep -qi 'hand'"
+  - name: "remove refuses to take an unmanaged directory"
+    command: "almanac remove hand-made"
+    should_fail: true
+  - name: "and the refusal left it on disk"
+    command: "test -f skills/hand-made/SKILL.md"

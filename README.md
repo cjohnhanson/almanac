@@ -57,6 +57,49 @@ refresh it on a cadence.
 - `dev:<path>` — a local snapshot of a skill you develop alongside.
   `sync --check` skips it and reports drift as information.
 
+## Composed libraries
+
+A library can draw on other libraries. Declare them in `stores.yml`,
+each under a local alias:
+
+```yaml
+format: 2
+stores:
+  - alias: shared
+    path: ../team-skills
+  - alias: upstream
+    git: https://example.com/org/skills
+```
+
+**Precedence.** A skill name is the identity, and two libraries can
+hold the same name. The nearer library wins: this library first, then
+each declared library in declaration order. `list`, `show`, and `index`
+all give the winner, so what you see is what an agent loads.
+
+A skill that loses a name is not discarded quietly. `almanac check`
+reports every shadowed name and the library it came from, because a
+skill that silently replaced another is the worst way to find out.
+
+**Linking.** A skill declares the skills it needs:
+
+```yaml
+---
+name: reviewing
+description: My review process.
+requires:
+  - shared:testing
+  - writing
+---
+```
+
+An entry with no alias names a skill in the same library. `almanac
+check` reports an entry that names no skill, and an entry that uses an
+alias the library does not declare.
+
+`almanac store list` shows the libraries and their skill counts.
+`almanac store sync` fetches the remote ones into a local cache; it is
+the only command that reaches the network.
+
 ## Documentation
 
 - [What is Almanac?](docs/what-is-almanac.md) — skill format, sources, design

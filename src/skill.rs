@@ -19,25 +19,41 @@ pub enum SkillLocation {
 }
 
 /// YAML frontmatter parsed from a SKILL.md file.
-#[derive(Debug, serde::Deserialize)]
+///
+/// A key that almanac does not model is kept, so a tool that writes its
+/// own key into a SKILL.md never loses it.
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 struct SkillFrontmatter {
     #[serde(default)]
     name: Option<String>,
     #[serde(default)]
     description: Option<String>,
+    #[serde(flatten)]
+    extra: serde_yml::Mapping,
 }
 
-/// Scan all configured skill sources and return an index of available skills.
-#[must_use] 
+/// Scan the configured sources and return the skills a command can
+/// reach.
+///
+/// The sources are in precedence order: the nearer source wins a name.
+/// A name that a later source also holds is dropped here, so the list
+/// shows what a command would actually load. `almanac check` reports
+/// the drop, because a skill that silently replaced another is the
+/// worst way to find out.
+#[must_use]
 pub fn index(project_dir: &Path, sources: &[SkillSource]) -> Vec<SkillEntry> {
-    let mut entries = Vec::new();
+    let mut entries: Vec<SkillEntry> = Vec::new();
 
     for source in sources {
         match source {
             SkillSource::Path { path } => {
                 let resolved = resolve_path(project_dir, path);
                 if let Ok(found) = scan_directory(&resolved) {
-                    entries.extend(found);
+                    let fresh: Vec<SkillEntry> = found
+                        .into_iter()
+                        .filter(|f| !entries.iter().any(|e| e.name == f.name))
+                        .collect();
+                    entries.extend(fresh);
                 }
             }
             SkillSource::Git { git: _ } => {
@@ -156,7 +172,7 @@ fn append_file_references(skill_name: &str, skill_dir: &Path, content: &mut Stri
 }
 
 /// Format the skill index for injection into agent context.
-#[must_use] 
+#[must_use]
 pub fn format_index(entries: &[SkillEntry]) -> String {
     if entries.is_empty() {
         return String::new();
@@ -171,7 +187,7 @@ pub fn format_index(entries: &[SkillEntry]) -> String {
 
 /// Format the skill list without a header. Use it when the caller
 /// supplies its own framing.
-#[must_use] 
+#[must_use]
 pub fn format_index_list(entries: &[SkillEntry]) -> String {
     use std::fmt::Write as _;
     let mut out = String::new();
@@ -189,7 +205,7 @@ pub fn format_index_list(entries: &[SkillEntry]) -> String {
 }
 
 /// Format the skill index as JSON for a machine to read.
-#[must_use] 
+#[must_use]
 pub fn format_index_json(entries: &[SkillEntry]) -> String {
     let items: Vec<serde_json::Value> = entries
         .iter()
@@ -234,15 +250,20 @@ fn parse_skill_md(skill_md: &Path, skill_dir: &Path) -> Result<SkillEntry, Error
     let content = std::fs::read_to_string(skill_md)
         .map_err(|e| Error::General(format!("failed to read {}: {e}", skill_md.display())))?;
 
-    let frontmatter = extract_frontmatter(&content)
-        .ok_or_else(|| Error::General(format!("no frontmatter in {}", skill_md.display())))?;
-
-    let parsed: SkillFrontmatter = serde_yml::from_str(frontmatter).map_err(|e| {
-        Error::General(format!(
-            "invalid frontmatter in {}: {e}",
+    // mdstore parses the frontmatter, so almanac, zettel, and tisket
+    // all read a frontmattered markdown file the same way. A
+    // hand-rolled reader drifts from the writer, and the drift shows up
+    // as a file that one tool writes and another cannot read.
+    let doc = mdstore::document::parse::<SkillFrontmatter>(&content).map_err(|e| match e {
+        mdstore::Error::MissingFrontmatter | mdstore::Error::UnclosedFrontmatter => {
+            Error::General(format!("no frontmatter in {}", skill_md.display()))
+        }
+        other => Error::General(format!(
+            "invalid frontmatter in {}: {other}",
             skill_md.display()
-        ))
+        )),
     })?;
+    let parsed = doc.frontmatter;
 
     let dir_name = skill_dir
         .file_name()
@@ -267,18 +288,12 @@ fn parse_skill_md(skill_md: &Path, skill_dir: &Path) -> Result<SkillEntry, Error
     })
 }
 
-fn extract_frontmatter(content: &str) -> Option<&str> {
-    let trimmed = content.trim_start();
-    let rest = trimmed.strip_prefix("---")?;
-    let end = rest.find("\n---")?;
-    Some(rest[..end].trim())
-}
-
 fn resolve_path(project_dir: &Path, path: &str) -> std::path::PathBuf {
     if let Some(rest) = path.strip_prefix("~/")
-        && let Some(home) = dirs::home_dir() {
-            return home.join(rest);
-        }
+        && let Some(home) = dirs::home_dir()
+    {
+        return home.join(rest);
+    }
     if Path::new(path).is_absolute() {
         Path::new(path).to_path_buf()
     } else {
@@ -290,22 +305,61 @@ fn resolve_path(project_dir: &Path, path: &str) -> std::path::PathBuf {
 mod tests {
     use super::*;
 
-    #[test]
-    fn extract_frontmatter_basic() {
-        let content = "---\nname: my-skill\ndescription: Does a thing\n---\n\n# My Skill\n";
-        let fm = extract_frontmatter(content).unwrap();
-        assert!(fm.contains("name: my-skill"));
-        assert!(fm.contains("description: Does a thing"));
+    /// Write a SKILL.md and parse it, as the scan does.
+    fn parse_content(content: &str) -> Result<SkillEntry, Error> {
+        let dir = tempfile::tempdir().unwrap();
+        let skill_dir = dir.path().join("probe-skill");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        let path = skill_dir.join("SKILL.md");
+        std::fs::write(&path, content).unwrap();
+        parse_skill_md(&path, &skill_dir)
     }
 
     #[test]
-    fn extract_frontmatter_missing_returns_none() {
-        assert!(extract_frontmatter("# No frontmatter\n").is_none());
+    fn a_file_without_frontmatter_is_rejected() {
+        let err = parse_content("# No frontmatter\n").unwrap_err().to_string();
+        assert!(err.contains("no frontmatter"), "{err}");
     }
 
     #[test]
-    fn extract_frontmatter_incomplete_returns_none() {
-        assert!(extract_frontmatter("---\nname: incomplete\n").is_none());
+    fn an_unclosed_frontmatter_block_is_rejected() {
+        let err = parse_content("---\nname: probe-skill\n")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("no frontmatter"), "{err}");
+    }
+
+    #[test]
+    fn invalid_yaml_is_rejected_with_the_file_named() {
+        let err = parse_content("---\nname: [unclosed\n---\nbody\n")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("invalid frontmatter"), "{err}");
+        assert!(err.contains("SKILL.md"), "{err}");
+    }
+
+    #[test]
+    fn a_quoted_description_with_metacharacters_round_trips() {
+        // A hand-rolled reader splits on the first "\n---", which a
+        // description containing that text would break. mdstore parses
+        // the YAML, so the value survives.
+        let entry = parse_content(
+            "---\nname: probe-skill\ndescription: \"colons: yes, brackets [x], and a quote\\\"\"\n---\nbody\n",
+        )
+        .unwrap();
+        assert_eq!(
+            entry.description,
+            "colons: yes, brackets [x], and a quote\""
+        );
+    }
+
+    #[test]
+    fn frontmatter_keys_almanac_does_not_model_are_kept() {
+        let entry = parse_content(
+            "---\nname: probe-skill\ndescription: d\nlicense: MIT\nversion: 2\n---\nbody\n",
+        )
+        .unwrap();
+        assert_eq!(entry.name, "probe-skill");
     }
 
     #[test]
@@ -534,7 +588,11 @@ mod tests {
             "---\nname: my-skill\ndescription: A skill with refs\n---\n\n# My Skill\n",
         )
         .unwrap();
-        std::fs::write(refs.join("deep-dive.md"), "# Deep Dive\n\nDetailed content.\n").unwrap();
+        std::fs::write(
+            refs.join("deep-dive.md"),
+            "# Deep Dive\n\nDetailed content.\n",
+        )
+        .unwrap();
         std::fs::write(refs.join("examples.md"), "# Examples\n\nSome examples.\n").unwrap();
         vec![SkillSource::Path {
             path: dir.join("skills").to_string_lossy().into_owned(),
@@ -588,6 +646,8 @@ mod tests {
 
     /// Helper: capture `show()` output as a string instead of printing to stdout.
     fn show_to_string(name: &str, project_dir: &Path, sources: &[SkillSource]) -> String {
-        show_captured(name, project_dir, sources).unwrap().unwrap_or_default()
+        show_captured(name, project_dir, sources)
+            .unwrap()
+            .unwrap_or_default()
     }
 }
