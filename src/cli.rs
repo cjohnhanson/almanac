@@ -206,7 +206,7 @@ pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Re
                 accept,
             },
         ),
-        Command::Store(cmd) => cmd_store(root, &cmd),
+        Command::Store(cmd) => cmd_store(root, cmd),
         Command::Check => cmd_check(root),
         Command::Sync { check } => crate::ops::sync(root, check),
         Command::Update { names, yes } => crate::ops::update(root, &names, yes),
@@ -216,7 +216,7 @@ pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Re
 }
 
 /// The `store` subcommands.
-fn cmd_store(root: &Path, cmd: &StoreCommand) -> Result<(), Error> {
+fn cmd_store(root: &Path, cmd: StoreCommand) -> Result<(), Error> {
     match cmd {
         StoreCommand::List => {
             let ws = crate::workspace::Workspace::open(root)?;
@@ -265,43 +265,25 @@ fn cmd_store(root: &Path, cmd: &StoreCommand) -> Result<(), Error> {
 /// Report the problems that the declarations create.
 fn cmd_check(root: &Path) -> Result<(), Error> {
     let ws = crate::workspace::Workspace::open(root)?;
-    let mut findings: Vec<String> = Vec::new();
-
-    // A requirement that names no skill.
-    for (skill, target) in ws.dangling_requires() {
-        findings.push(format!("  {skill} requires {target}, which names no skill"));
-    }
-    // A name that two libraries hold. The nearer one wins, and the
-    // loser is invisible unless this says so.
-    for (name, winner, losers) in ws.shadowed() {
-        findings.push(format!(
-            "  '{name}' comes from {winner}; also in {}",
-            losers.join(", ")
-        ));
-    }
-    for alias in ws.missing() {
-        findings.push(format!("  library '{alias}' is not available"));
-    }
-    for (alias, why) in ws.unshareable(root) {
-        findings.push(format!("  '{alias}': {why}"));
-    }
-    for skipped in ws.skipped() {
-        findings.push(format!("  skipped {skipped}"));
-    }
-
+    let findings = ws.check(root);
     if findings.is_empty() {
         println!("no problems found");
         return Ok(());
     }
     println!("{} problem(s):", findings.len());
     for f in &findings {
-        println!("{f}");
+        match f.kind.as_str() {
+            "requirement" => println!("  {} {}", f.subject, f.detail),
+            "shadowed" => println!("  '{}' {}", f.subject, f.detail),
+            "unreachable library" => println!("  library '{}' {}", f.subject, f.detail),
+            _ => println!("  '{}': {}", f.subject, f.detail),
+        }
     }
     std::process::exit(1);
 }
 
 /// The library subcommands.
-#[derive(clap::Subcommand)]
+#[derive(clap::Subcommand, Clone, Copy)]
 pub enum StoreCommand {
     /// List the libraries this library reads, in precedence order.
     List,
