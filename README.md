@@ -100,6 +100,21 @@ alias the library does not declare.
 `almanac store sync` fetches the remote ones into a local cache; it is
 the only command that reaches the network.
 
+## Serving a library
+
+```sh
+almanac serve                          # stdin and stdout, for a child process
+almanac serve --bind 127.0.0.1:8931    # for clients that connect
+```
+
+The server offers the skills extension, readable resources, and tools.
+A client cannot be asked which it understands, so the surfaces are
+configuration: `--surfaces skills,resources,tools`. Tools are in every
+default, because every client can call one. A served library is
+read-only until `--access read-write` says otherwise.
+
+Read `almanac docs composition` for the model.
+
 ## Documentation
 
 - [What is Almanac?](docs/what-is-almanac.md) — skill format, sources, design

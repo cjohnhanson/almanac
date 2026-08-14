@@ -30,10 +30,13 @@ clap_mangen = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yml = "0.0.12"
-mdstore = { git = "https://github.com/cjohnhanson/mdstore", rev = "4235eaa" }
+mdstore = { git = "https://github.com/cjohnhanson/mdstore", rev = "ddfeb05", features = ["mcp"] }
 dirs = "6"
 thiserror = "2"
 sigpipe = "0.1.3"
+rmcp = { version = "3", features = ["server", "transport-io", "transport-streamable-http-server"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std", "signal", "net"] }
+axum = "0.8"
 sha2 = "0.11.0"
 unicode-normalization = "0.1.25"
 
