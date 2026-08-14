@@ -10,19 +10,26 @@ pub struct DocPage {
 
 impl DocPage {
     /// Return the markdown content without the metadata comment.
-    #[must_use] 
+    #[must_use]
     pub fn content(&self) -> &str {
         let md = self.raw;
         if let Some(start) = md.find("<!-- metadata")
-            && let Some(end) = md[start..].find("-->") {
-                return md[start + end + 3..].trim_start_matches('\n');
-            }
+            && let Some(end) = md[start..].find("-->")
+        {
+            return md[start + end + 3..].trim_start_matches('\n');
+        }
         md
     }
 }
 
 /// All almanac documentation pages.
 pub static PAGES: &[DocPage] = &[
+    DocPage {
+        slug: "composition",
+        title: "Composed libraries",
+        description: "Declaring other libraries, name precedence, and skill requirements.",
+        raw: include_str!("../docs/composition.md"),
+    },
     DocPage {
         slug: "curation",
         title: "Curation and pinning",
@@ -49,7 +56,7 @@ pub fn list() {
 }
 
 /// Print a doc by identifier. Returns false if not found.
-#[must_use] 
+#[must_use]
 pub fn show(identifier: &str) -> bool {
     let Some(page) = find(identifier) else {
         return false;
@@ -70,13 +77,13 @@ pub fn search(query: &str) {
 
 /// Find a doc page by flexible identifier: exact slug, slug prefix, or
 /// case-insensitive title match.
-#[must_use] 
+#[must_use]
 pub fn find(identifier: &str) -> Option<&'static DocPage> {
     find_in(PAGES, identifier)
 }
 
 /// Find a doc page in a given slice by flexible identifier.
-#[must_use] 
+#[must_use]
 pub fn find_in<'a>(pages: &'a [DocPage], identifier: &str) -> Option<&'a DocPage> {
     // 1. Exact slug match
     if let Some(page) = pages.iter().find(|p| p.slug == identifier) {
@@ -104,7 +111,7 @@ pub fn find_in<'a>(pages: &'a [DocPage], identifier: &str) -> Option<&'a DocPage
 
 /// Format a listing of doc pages. Shows the slug to type, then the
 /// description.
-#[must_use] 
+#[must_use]
 pub fn format_list(pages: &[DocPage]) -> String {
     use std::fmt::Write as _;
     let mut out = String::new();
@@ -115,7 +122,7 @@ pub fn format_list(pages: &[DocPage]) -> String {
 }
 
 /// Format a listing from a vec of page references.
-#[must_use] 
+#[must_use]
 pub fn format_list_from_refs(pages: &[&DocPage]) -> String {
     use std::fmt::Write as _;
     let mut out = String::new();
@@ -126,7 +133,7 @@ pub fn format_list_from_refs(pages: &[&DocPage]) -> String {
 }
 
 /// Find all docs matching a query string. Returns matching pages.
-#[must_use] 
+#[must_use]
 pub fn find_matching<'a>(pages: &'a [DocPage], query: &str) -> Vec<&'a DocPage> {
     let q = query.to_lowercase();
     pages
@@ -171,7 +178,10 @@ mod tests {
     fn content_strips_metadata_comment() {
         let page = &TEST_PAGES[0];
         let content = page.content();
-        assert!(!content.contains("<!-- metadata"), "metadata comment should be stripped");
+        assert!(
+            !content.contains("<!-- metadata"),
+            "metadata comment should be stripped"
+        );
         assert!(content.starts_with("# What is Almanac?"));
     }
 

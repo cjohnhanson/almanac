@@ -110,6 +110,11 @@ pub enum Command {
         #[arg(long, default_value_t = 4096)]
         max_bytes: usize,
     },
+    /// Manage the declared libraries.
+    #[command(subcommand)]
+    Store(StoreCommand),
+    /// Check the libraries for dangling requirements and store problems.
+    Check,
     /// Browse bundled documentation.
     Docs {
         /// Topic slug to print, or "search" to search.
@@ -133,7 +138,12 @@ pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Re
 
         Command::GenCompletions { shell } => {
             use clap::CommandFactory as _;
-            clap_complete::generate(shell, &mut Args::command(), "almanac", &mut std::io::stdout());
+            clap_complete::generate(
+                shell,
+                &mut Args::command(),
+                "almanac",
+                &mut std::io::stdout(),
+            );
             Ok(())
         }
 
@@ -196,6 +206,8 @@ pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Re
                 accept,
             },
         ),
+        Command::Store(cmd) => cmd_store(root, &cmd),
+        Command::Check => cmd_check(root),
         Command::Sync { check } => crate::ops::sync(root, check),
         Command::Update { names, yes } => crate::ops::update(root, &names, yes),
         Command::Remove { name } => crate::ops::remove(root, &name),
@@ -203,11 +215,154 @@ pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Re
     }
 }
 
-/// Run the standalone binary. It uses the CLI arguments only.
+/// The `store` subcommands.
+fn cmd_store(root: &Path, cmd: &StoreCommand) -> Result<(), Error> {
+    match cmd {
+        StoreCommand::List => {
+            let ws = crate::workspace::Workspace::open(root)?;
+            for m in ws.store_members() {
+                let label = if m.alias.is_empty() {
+                    "(this library)".to_string()
+                } else {
+                    m.alias.clone()
+                };
+                let state = m.unavailable.as_ref().map_or_else(
+                    || format!("{} skill(s)", m.skills),
+                    |why| format!("unavailable: {why}"),
+                );
+                let age = m
+                    .age
+                    .as_ref()
+                    .map_or_else(String::new, |age| format!("  synced {age}"));
+                println!("{label}  {}  {state}{age}", m.source);
+            }
+            Ok(())
+        }
+        StoreCommand::Sync => {
+            let ws = crate::workspace::Workspace::open_fetching(root)?;
+            let results = ws.sync_all();
+            if results.is_empty() {
+                println!("no remote libraries declared");
+            }
+            let mut failed = false;
+            for (alias, outcome) in results {
+                match outcome {
+                    Ok(()) => println!("{alias}  synced"),
+                    Err(e) => {
+                        failed = true;
+                        eprintln!("{alias}  failed: {e}");
+                    }
+                }
+            }
+            if failed {
+                std::process::exit(1);
+            }
+            Ok(())
+        }
+    }
+}
+
+/// Report the problems that the declarations create.
+fn cmd_check(root: &Path) -> Result<(), Error> {
+    let ws = crate::workspace::Workspace::open(root)?;
+    let mut findings: Vec<String> = Vec::new();
+
+    // A requirement that names no skill.
+    for (skill, target) in ws.dangling_requires() {
+        findings.push(format!("  {skill} requires {target}, which names no skill"));
+    }
+    // A name that two libraries hold. The nearer one wins, and the
+    // loser is invisible unless this says so.
+    for (name, winner, losers) in ws.shadowed() {
+        findings.push(format!(
+            "  '{name}' comes from {winner}; also in {}",
+            losers.join(", ")
+        ));
+    }
+    for alias in ws.missing() {
+        findings.push(format!("  library '{alias}' is not available"));
+    }
+    for (alias, why) in ws.unshareable(root) {
+        findings.push(format!("  '{alias}': {why}"));
+    }
+    for skipped in ws.skipped() {
+        findings.push(format!("  skipped {skipped}"));
+    }
+
+    if findings.is_empty() {
+        println!("no problems found");
+        return Ok(());
+    }
+    println!("{} problem(s):", findings.len());
+    for f in &findings {
+        println!("{f}");
+    }
+    std::process::exit(1);
+}
+
+/// The library subcommands.
+#[derive(clap::Subcommand)]
+pub enum StoreCommand {
+    /// List the libraries this library reads, in precedence order.
+    List,
+    /// Fetch the declared remote libraries into the local cache.
+    Sync,
+}
+
+/// Run the standalone binary.
 pub fn run(args: Args) -> Result<(), Error> {
     let root = Path::new(&args.root);
-    // Standalone mode: no config sources, only CLI --source flags.
-    run_command(root, &[], args.command)
+    // The curated library is a source. Without this, `almanac init`
+    // and `almanac add` build a library that `almanac list` cannot
+    // see, and the tool's main purpose fails on its own output.
+    run_command(root, &manifest_sources(root), args.command)
+}
+
+/// The library directory that `almanac.yml` governs, as a source.
+/// A directory with no manifest contributes nothing.
+fn manifest_sources(root: &Path) -> Vec<SkillSource> {
+    let mut sources = Vec::new();
+    if let Ok(manifest) = crate::manifest::Manifest::load(root) {
+        let library = manifest.library_dir(root);
+        if library.is_dir() {
+            sources.push(SkillSource::Path {
+                path: library.to_string_lossy().into_owned(),
+            });
+        }
+    }
+    // Each declared library follows this one, in declaration order, so
+    // a name that two libraries hold resolves to the nearer library.
+    if let Ok(ws) = crate::workspace::Workspace::open(root) {
+        for row in ws.store_members().iter().skip(1) {
+            if row.unavailable.is_some() {
+                continue;
+            }
+            if let Some(dir) = declared_library_dir(root, &row.alias) {
+                sources.push(SkillSource::Path { path: dir });
+            }
+        }
+    }
+    sources
+}
+
+/// The directory a declared library keeps its skills in, when that
+/// library is a directory on this machine.
+fn declared_library_dir(root: &Path, alias: &str) -> Option<String> {
+    let config = mdstore::store::StoresConfig::load(root).ok()?;
+    let source = config.source(alias)?;
+    let mdstore::StoreSource::Path(p) = source else {
+        return None;
+    };
+    let base = if p.is_absolute() {
+        p.clone()
+    } else {
+        root.join(p)
+    };
+    let library = crate::manifest::Manifest::load(&base)
+        .map_or_else(|_| base.join("skills"), |m| m.library_dir(&base));
+    library
+        .is_dir()
+        .then(|| library.to_string_lossy().into_owned())
 }
 
 fn cmd_list(root: &Path, sources: &[SkillSource]) {
