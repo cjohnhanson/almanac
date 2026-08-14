@@ -1,0 +1,57 @@
+doc: |
+  Two libraries, one declared by the other. They hold the name
+  'writing' in common, and one skill requires a skill from the other
+  library.
+
+assertions:
+  # The closure
+  - name: "store list shows both libraries"
+    command: "test $(almanac store list | wc -l) -eq 2"
+  - name: "the declared library is named by its alias"
+    command: "almanac store list | grep -q '^shared '"
+  - name: "each library reports its skill count"
+    command: "almanac store list | grep '^shared ' | grep -q '2 skill(s)'"
+
+  # Precedence
+  - name: "list gives one entry for each name"
+    command: "test $(almanac list | wc -l) -eq 3"
+  - name: "the nearer library wins the shared name"
+    command: "almanac list | grep 'writing' | grep -q 'My writing guidance'"
+  - name: "show loads the winner"
+    command: "almanac show writing | grep -q 'Writing (mine)'"
+  - name: "show does not load the shadowed skill"
+    command: "almanac show writing | grep -q 'Writing (shared)'"
+    should_fail: true
+  - name: "a name only the declared library holds still resolves"
+    command: "almanac show testing | grep -q '# Testing'"
+  - name: "the index agrees with the list"
+    command: "almanac index | jq -e 'length == 3'"
+  - name: "the index holds no duplicate name"
+    command: "almanac index | jq -e '([.[].name] | unique | length) == 3'"
+
+  # Shadowing is reported, never silent
+  - name: "check reports the shadowed name"
+    command: "almanac check 2>&1 | grep -q \"'writing' comes from\""
+  - name: "the report names the library that lost"
+    command: "almanac check 2>&1 | grep \"'writing'\" | grep -q 'shared'"
+  - name: "check exits nonzero while a name is shadowed"
+    command: "almanac check"
+    should_fail: true
+
+  # Linking
+  - name: "a requirement that names another library resolves"
+    command: "almanac check 2>&1 | grep -q 'shared:testing'"
+    should_fail: true
+  - name: "a requirement that names no skill is reported"
+    command: "mkdir -p local/broken && printf -- '---\\nname: broken\\ndescription: d\\nrequires:\\n  - shared:nosuchskill\\n---\\nx\\n' > local/broken/SKILL.md && almanac check 2>&1 | grep -q 'requires shared:nosuchskill'"
+  - name: "the report names the skill that declared it"
+    command: "almanac check 2>&1 | grep 'nosuchskill' | grep -q 'broken'"
+  - name: "an undeclared alias is reported too"
+    command: "printf -- '---\\nname: broken\\ndescription: d\\nrequires:\\n  - nope:thing\\n---\\nx\\n' > local/broken/SKILL.md && almanac check 2>&1 | grep -q 'nope:thing'"
+  - name: "with the requirement fixed, only the shadowing remains"
+    command: "rm -rf local/broken && test $(almanac check 2>&1 | grep -c '^  ') -eq 1"
+
+  # Remote libraries
+  - name: "sync reports that no remote library is declared"
+    command: "almanac store sync"
+    stdout: "no remote libraries declared\n"

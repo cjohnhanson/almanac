@@ -7,3 +7,17 @@ transitions:
       printf '%s\n' '# Examples' '' 'Concrete examples for the test skill.' > skills/test-skill/references/examples.md
       printf '%s\n' '---' 'name: plain-skill' 'description: A skill without references.' '---' '' '# Plain Skill' '' 'No references directory here.' > skills/plain-skill/SKILL.md
     target: "../has-skill-with-refs"
+
+  # Two libraries: this one and a declared one. They hold a name in
+  # common, so precedence decides which skill a command loads.
+  - name: "declare a second library"
+    command: |
+      mkdir -p shared/skills/writing shared/skills/testing local/writing local/reviewing
+      printf -- '---\nname: writing\ndescription: Shared writing guidance.\n---\n\n# Writing (shared)\n' > shared/skills/writing/SKILL.md
+      printf -- '---\nname: testing\ndescription: Shared testing guidance.\n---\n\n# Testing\n' > shared/skills/testing/SKILL.md
+      printf -- '---\nname: writing\ndescription: My writing guidance.\n---\n\n# Writing (mine)\n' > local/writing/SKILL.md
+      printf -- '---\nname: reviewing\ndescription: My review process.\nrequires:\n  - shared:testing\n  - writing\n---\n\n# Reviewing\n' > local/reviewing/SKILL.md
+      printf 'library: skills\nskills: []\n' > shared/almanac.yml
+      printf 'library: local\nskills: []\n' > almanac.yml
+      printf 'format: 2\nstores:\n  - alias: shared\n    path: ./shared\n' > stores.yml
+    target: "../composed"
