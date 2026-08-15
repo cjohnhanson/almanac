@@ -122,9 +122,6 @@ pub enum Command {
         /// call, so a default keeps them on.
         #[arg(long, default_value = "skills,tools")]
         surfaces: String,
-        /// What a caller may do: read-only or read-write.
-        #[arg(long, default_value = "read-only")]
-        access: String,
         /// Where to listen. Omitted, the server speaks on stdin and
         /// stdout, for a client that starts it as a child process.
         /// Given, it serves over HTTP for a client that connects to it.
@@ -224,11 +221,7 @@ pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Re
         ),
         Command::Store(cmd) => cmd_store(root, cmd),
         Command::Check => cmd_check(root),
-        Command::Serve {
-            surfaces,
-            access,
-            bind,
-        } => cmd_serve(root, &surfaces, &access, bind.as_deref()),
+        Command::Serve { surfaces, bind } => cmd_serve(root, &surfaces, bind.as_deref()),
         Command::Sync { check } => crate::ops::sync(root, check),
         Command::Update { names, yes } => crate::ops::update(root, &names, yes),
         Command::Remove { name } => crate::ops::remove(root, &name),
@@ -304,17 +297,14 @@ fn cmd_check(root: &Path) -> Result<(), Error> {
 }
 
 /// Serve this library over MCP.
-fn cmd_serve(
-    root: &Path,
-    surfaces: &str,
-    access: &str,
-    bind: Option<&str>,
-) -> Result<(), Error> {
-    let surfaces = mdstore::mcp::Surfaces::parse_list(surfaces)
-        .map_err(|e| Error::General(e.to_string()))?;
-    let access: mdstore::mcp::Access = access.parse().map_err(|e: mdstore::Error| Error::General(e.to_string()))?;
-    let mut config = mdstore::mcp::ServeConfig::read_only(root, surfaces, "almanac");
-    config.access = access;
+///
+/// A served library is always read-only. Almanac's writes are curation:
+/// `add` and `accept` decide what the library vouches for, and that
+/// decision is a person's. No access mode makes them callable.
+fn cmd_serve(root: &Path, surfaces: &str, bind: Option<&str>) -> Result<(), Error> {
+    let surfaces =
+        mdstore::mcp::Surfaces::parse_list(surfaces).map_err(|e| Error::General(e.to_string()))?;
+    let config = mdstore::mcp::ServeConfig::read_only(root, surfaces, "almanac");
     crate::serve::run(config, bind)
 }
 
@@ -362,7 +352,6 @@ fn manifest_sources(root: &Path) -> Vec<SkillSource> {
     }
     sources
 }
-
 
 fn cmd_list(root: &Path, sources: &[SkillSource]) {
     let entries = skill::index(root, sources);
