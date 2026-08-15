@@ -443,7 +443,45 @@ impl Workspace {
                 kind: "scan".to_string(),
             });
         }
+        // A declaration the walk could not follow at all. Without this
+        // the closure was silently shorter than the config asked for.
+        for finding in &self.snapshot.graph.findings {
+            findings.push(Finding {
+                subject: "stores.yml".to_string(),
+                detail: finding.clone(),
+                kind: "declaration".to_string(),
+            });
+        }
+        // A file beside a SKILL.md that could not be read. It is absent
+        // from the published digests, and a host that verifies would
+        // otherwise never learn it was dropped.
+        for view in self.skills().iter().filter(|v| !v.shadowed) {
+            for problem in self.skill_file_problems(view) {
+                findings.push(Finding {
+                    subject: view.skill.name.clone(),
+                    detail: problem,
+                    kind: "unreadable file".to_string(),
+                });
+            }
+        }
         findings
+    }
+
+    /// Files beside a skill's SKILL.md that could not be read.
+    #[must_use]
+    pub fn skill_file_problems(&self, view: &View<'_>) -> Vec<String> {
+        let member = &self.snapshot.graph.members[view.id.member];
+        let Some(mdstore::StoreContent::Dir(root)) = member.content.as_ref() else {
+            return Vec::new();
+        };
+        let Some(parent) = std::path::Path::new(&view.skill.rel_path).parent() else {
+            return Vec::new();
+        };
+        let skill_dir = root.join(parent);
+        let mut problems = Vec::new();
+        collect_problems(&skill_dir, &skill_dir, &mut problems);
+        problems.sort();
+        problems
     }
 
     /// The files beside a skill's SKILL.md, each with its bytes.
@@ -527,6 +565,37 @@ fn collect_files(base: &std::path::Path, dir: &std::path::Path, out: &mut Vec<(S
         }
         if let Ok(bytes) = std::fs::read(&path) {
             out.push((rel, bytes));
+        }
+    }
+}
+
+/// Walk a skill directory and report what could not be read.
+fn collect_problems(base: &std::path::Path, dir: &std::path::Path, out: &mut Vec<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        out.push(format!("{} is not readable", dir.display()));
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        if file_type.is_symlink() {
+            let rel = path.strip_prefix(base).unwrap_or(&path);
+            out.push(format!("{} is a symlink and is not published", rel.display()));
+            continue;
+        }
+        if file_type.is_dir() {
+            collect_problems(base, &path, out);
+            continue;
+        }
+        let rel = path.strip_prefix(base).unwrap_or(&path);
+        let rel = rel.to_string_lossy().to_string();
+        if rel == "SKILL.md" || rel.starts_with('.') {
+            continue;
+        }
+        if std::fs::read(&path).is_err() {
+            out.push(format!("{rel} is not readable and is not published"));
         }
     }
 }
