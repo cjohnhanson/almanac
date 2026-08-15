@@ -46,6 +46,28 @@ pub struct AddOpts {
     pub accept: bool,
 }
 
+/// Say where the unaccepted content is, and what to do with it.
+///
+/// A git source was copied into a staging directory almanac owns, so
+/// removing it is the way to discard it. A dev source was read in
+/// place from a directory the user owns, and nothing was staged.
+/// Telling them to remove that path would tell them to delete the
+/// skill they are adding.
+fn report_not_accepted(shown: &Path, staged: bool) {
+    if staged {
+        println!(
+            "staged only; inspect {} and run again with --accept",
+            shown.display()
+        );
+        println!("remove {} to discard it", shown.display());
+    } else {
+        println!(
+            "read in place from {}; nothing was staged. Run again with --accept.",
+            shown.display()
+        );
+    }
+}
+
 /// The path a user should inspect for a staged-but-unaccepted skill.
 ///
 /// A git source lives in a temp directory that drops when add returns,
@@ -156,11 +178,7 @@ pub fn add(dir: &Path, source: &str, opts: &AddOpts) -> Result<(), Error> {
 
     if !opts.accept {
         let shown = staged_inspect_path(dir, &name, &skill_src, tmp_dir.is_some())?;
-        println!(
-            "staged only; inspect {} and run again with --accept",
-            shown.display()
-        );
-        println!("remove {} to discard it", shown.display());
+        report_not_accepted(&shown, tmp_dir.is_some());
         return Err(Error::General("not accepted".into()));
     }
 
