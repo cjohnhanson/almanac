@@ -141,11 +141,15 @@ fn collect(
             .collect();
         if meta.file_type().is_symlink() {
             let target = std::fs::read_link(&p).map_err(|_| HashError::Unreadable(rel.clone()))?;
-            let resolved = if target.is_absolute() {
-                target.clone()
-            } else {
-                p.parent().expect("has parent").join(&target)
-            };
+            // An absolute target is refused wherever it points. A
+            // tree that gets copied can only carry links relative to
+            // itself: copy it elsewhere and an absolute link still
+            // names the old machine's path, so the copy hashes
+            // differently from its pin and drifts from birth.
+            if target.is_absolute() {
+                return Err(HashError::EscapingSymlink(rel));
+            }
+            let resolved = p.parent().expect("has parent").join(&target);
             let canonical_root = root
                 .canonicalize()
                 .map_err(|_| HashError::Unreadable(root.display().to_string()))?;

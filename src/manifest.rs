@@ -98,9 +98,20 @@ impl Manifest {
         std::fs::rename(&tmp, &path).map_err(|e| ManifestError::Io(e.to_string()))
     }
 
-    #[must_use]
-    pub fn library_dir(&self, manifest_dir: &Path) -> PathBuf {
-        manifest_dir.join(&self.library)
+    /// The directory this manifest governs.
+    ///
+    /// The declared value is guarded the same way a dependency's is,
+    /// by the one function in mdstore that decides containment. Two
+    /// resolutions that disagree are how a value ends up accepted here
+    /// and refused there, with nothing said either way.
+    pub fn library_dir(&self, manifest_dir: &Path) -> Result<PathBuf, ManifestError> {
+        mdstore::store::document_dir(manifest_dir, &self.library).map_err(|e| {
+            ManifestError::Invalid(format!(
+                "library '{}' does not stay inside {}: {e}",
+                self.library,
+                manifest_dir.display()
+            ))
+        })
     }
 
     #[must_use]

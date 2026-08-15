@@ -431,6 +431,34 @@ async fn serve_stdio(config: ServeConfig) -> Result<(), Error> {
     Ok(())
 }
 
+/// Refuse a request a web page made.
+///
+/// A page on the open web can post to a server on this machine, and
+/// the name it used may resolve here after the page loaded. The reply
+/// stays inside the browser only if the server refuses the request,
+/// and a served store has no authentication to fall back on.
+///
+/// A request with no `Origin` header is not a browser request, so a
+/// client that sends none is left alone.
+async fn refuse_foreign_origin(
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use axum::response::IntoResponse as _;
+
+    if let Some(origin) = request.headers().get(axum::http::header::ORIGIN)
+        && let Ok(text) = origin.to_str()
+        && !mdstore::mcp::origin_is_local(text)
+    {
+        return (
+            axum::http::StatusCode::FORBIDDEN,
+            "this server answers only a client on this machine",
+        )
+            .into_response();
+    }
+    next.run(request).await
+}
+
 async fn serve_http(config: ServeConfig, addr: &str) -> Result<(), Error> {
     use rmcp::transport::streamable_http_server::{
         StreamableHttpService, session::local::LocalSessionManager,
@@ -443,7 +471,9 @@ async fn serve_http(config: ServeConfig, addr: &str) -> Result<(), Error> {
         rmcp::transport::streamable_http_server::StreamableHttpServerConfig::default(),
     );
 
-    let router = axum::Router::new().nest_service("/mcp", service);
+    let router = axum::Router::new()
+        .nest_service("/mcp", service)
+        .layer(axum::middleware::from_fn(refuse_foreign_origin));
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .map_err(|e| Error::General(format!("cannot listen on {addr}: {e}")))?;
@@ -453,6 +483,14 @@ async fn serve_http(config: ServeConfig, addr: &str) -> Result<(), Error> {
     // The operator needs to know what was actually opened before a
     // client connects.
     eprintln!("almanac serving on http://{bound}/mcp (read-only)");
+    // A served store has no authentication, so the operator must know
+    // when it is reachable from more than this machine.
+    if !mdstore::mcp::addr_is_loopback(&bound.to_string()) {
+        eprintln!(
+            "warning: {bound} is not a loopback address, and a served store authenticates nobody. \
+             Put an authenticating proxy in front of it, or bind 127.0.0.1."
+        );
+    }
     axum::serve(listener, router)
         .with_graceful_shutdown(async {
             let _ = tokio::signal::ctrl_c().await;

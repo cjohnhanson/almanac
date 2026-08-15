@@ -122,8 +122,11 @@ fn show_reference(
     project_dir: &Path,
     sources: &[SkillSource],
 ) -> Result<Option<String>, Error> {
-    // Reject path traversal.
-    if ref_file.contains("..") {
+    // A reference names one file inside the skill's references
+    // directory. A '..' check alone let an absolute path through, and
+    // join replaces on an absolute component, so the name decided
+    // which file was read.
+    if !mdstore::is_plain_stem(ref_file) {
         return Ok(None);
     }
 
@@ -132,14 +135,26 @@ fn show_reference(
         if entry.name == skill_name {
             let SkillLocation::File(path) = &entry.source;
             let skill_dir = Path::new(path).parent().unwrap_or_else(|| Path::new("."));
-            let ref_path = skill_dir.join("references").join(ref_file);
-            if ref_path.is_file() {
-                let content = std::fs::read_to_string(&ref_path).map_err(|e| {
-                    Error::General(format!("failed to read {}: {e}", ref_path.display()))
-                })?;
-                return Ok(Some(content));
+            let refs_dir = skill_dir.join("references");
+            let ref_path = refs_dir.join(ref_file);
+
+            // A library may be content somebody else controls, so the
+            // resolved file must still be inside the references
+            // directory, and it must be a regular file rather than a
+            // link to one somewhere else.
+            let (Ok(base), Ok(resolved)) = (refs_dir.canonicalize(), ref_path.canonicalize())
+            else {
+                return Ok(None);
+            };
+            if !resolved.starts_with(&base) {
+                return Ok(None);
             }
-            return Ok(None);
+            if !mdstore::store::is_regular_file(&resolved) {
+                return Ok(None);
+            }
+            let content = mdstore::store::read_document(&resolved)
+                .map_err(|e| Error::General(format!("failed to read {}: {e}", resolved.display())))?;
+            return Ok(Some(content));
         }
     }
 

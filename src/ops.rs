@@ -190,7 +190,7 @@ pub fn add(dir: &Path, source: &str, opts: &AddOpts) -> Result<(), Error> {
         rev,
         sha256: String::new(),
     };
-    let library = manifest.library_dir(dir);
+    let library = manifest.library_dir(dir)?;
     let hash = vendor::vendor(&skill_src, &library, &entry_proto)?;
     manifest.upsert(Entry {
         sha256: hash,
@@ -203,7 +203,7 @@ pub fn add(dir: &Path, source: &str, opts: &AddOpts) -> Result<(), Error> {
 
 pub fn sync(dir: &Path, check: bool) -> Result<(), Error> {
     let manifest = Manifest::load(dir)?;
-    let library = manifest.library_dir(dir);
+    let library = manifest.library_dir(dir)?;
     let mut failures = 0;
 
     for entry in &manifest.skills {
@@ -284,7 +284,7 @@ pub fn sync(dir: &Path, check: bool) -> Result<(), Error> {
 
 pub fn update(dir: &Path, names: &[String], yes: bool) -> Result<(), Error> {
     let mut manifest = Manifest::load(dir)?;
-    let library = manifest.library_dir(dir);
+    let library = manifest.library_dir(dir)?;
     let selected: Vec<Entry> = manifest
         .skills
         .iter()
@@ -351,7 +351,7 @@ pub fn remove(dir: &Path, name: &str) -> Result<(), Error> {
     if manifest.entry(name).is_none() {
         return Err(Error::General(format!("`{name}` is not in the manifest")));
     }
-    let vendored = manifest.library_dir(dir).join(name);
+    let vendored = manifest.library_dir(dir)?.join(name);
     if vendored.exists() {
         if !vendor::is_managed(&vendored) {
             return Err(Error::General(format!(
@@ -369,7 +369,7 @@ pub fn remove(dir: &Path, name: &str) -> Result<(), Error> {
 
 pub fn list(dir: &Path) -> Result<(), Error> {
     let manifest = Manifest::load(dir)?;
-    let library = manifest.library_dir(dir);
+    let library = manifest.library_dir(dir)?;
     for entry in &manifest.skills {
         let vendored = library.join(&entry.name);
         let state = if vendored.is_dir() {
@@ -413,7 +413,7 @@ pub fn list(dir: &Path) -> Result<(), Error> {
 /// never cuts the list without a note.
 pub fn index_md(dir: &Path, max_bytes: usize) -> Result<String, Error> {
     let manifest = Manifest::load(dir)?;
-    let library = manifest.library_dir(dir);
+    let library = manifest.library_dir(dir)?;
     let entries = skill::index(
         dir,
         &[SkillSource::Path {
@@ -430,7 +430,8 @@ pub fn index_md_sources(dir: &Path, sources: &[SkillSource], max_bytes: usize) -
     format_index_md(&skill::index(dir, sources), max_bytes)
 }
 
-fn format_index_md(entries: &[skill::SkillEntry], max_bytes: usize) -> String {
+#[must_use]
+pub fn format_index_md(entries: &[skill::SkillEntry], max_bytes: usize) -> String {
     let mut out = String::from("Available skills (show with `almanac show <name>`):\n");
     let mut omitted = 0usize;
     for e in entries {
