@@ -27,7 +27,22 @@ pub fn scan(root: &Path) -> Vec<Flag> {
     flags
 }
 
+/// How deep the walk goes. A backstop: a skill nests a few levels, and
+/// anything deeper is a structure worth flagging rather than following.
+const MAX_DEPTH: usize = 16;
+
 fn walk(root: &Path, dir: &Path, flags: &mut Vec<Flag>) {
+    walk_at(root, dir, flags, 0);
+}
+
+fn walk_at(root: &Path, dir: &Path, flags: &mut Vec<Flag>, depth: usize) {
+    if depth > MAX_DEPTH {
+        flags.push(Flag {
+            path: rel(root, dir),
+            what: "nested deeper than the scanner follows".into(),
+        });
+        return;
+    }
     let Ok(entries) = std::fs::read_dir(dir) else {
         flags.push(Flag {
             path: rel(root, dir),
@@ -41,8 +56,22 @@ fn walk(root: &Path, dir: &Path, flags: &mut Vec<Flag>) {
         if denied(&name) {
             continue;
         }
-        if p.is_dir() {
-            walk(root, &p, flags);
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        // The scanner reads a skill somebody else wrote. Following a
+        // link would walk out of the skill, and a link to a parent
+        // directory would not end. The reviewer is told what was
+        // skipped, because a link is itself worth seeing.
+        if file_type.is_symlink() {
+            flags.push(Flag {
+                path: rel(root, &p),
+                what: "symlink, not scanned".into(),
+            });
+            continue;
+        }
+        if file_type.is_dir() {
+            walk_at(root, &p, flags, depth + 1);
             continue;
         }
         let rp = rel(root, &p);

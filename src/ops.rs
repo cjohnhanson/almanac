@@ -144,6 +144,12 @@ pub fn add(dir: &Path, source: &str, opts: &AddOpts) -> Result<(), Error> {
         )));
     }
 
+    // Hash the tree before anything is copied. hash_tree refuses a
+    // symlink that leaves the skill, so an escaping link stops the add
+    // rather than being staged first and refused afterwards.
+    crate::hash::hash_tree(&skill_src)
+        .map_err(|e| Error::General(format!("cannot hash {name}: {e}")))?;
+
     // Red-flag report before anything lands.
     let flags = flags::scan(&skill_src);
     print_flags(&name, &flags);
@@ -154,6 +160,7 @@ pub fn add(dir: &Path, source: &str, opts: &AddOpts) -> Result<(), Error> {
             "staged only; inspect {} and run again with --accept",
             shown.display()
         );
+        println!("remove {} to discard it", shown.display());
         return Err(Error::General("not accepted".into()));
     }
 

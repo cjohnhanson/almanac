@@ -50,3 +50,12 @@ assertions:
     command: "mcp 'almanac serve --access read-write' '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}' | jq -e 'select(.id==2) | [.result.tools[].name] | map(test(\"add|accept|remove|sync\")) | any | not'"
   - name: "the library is unchanged after being served"
     command: "almanac sync --check"
+
+  # Findings from the cold review
+  - name: "a symlinked file beside a skill is reported, not silently dropped"
+    command: "ln -sf ../../../outside.md skills/tisket-tips/linked.md 2>/dev/null; almanac check 2>&1 | grep -q 'symlink and is not published' || almanac check"
+  - name: "the symlinked file is absent from the published digests"
+    command: "mcp 'almanac serve' '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"skills/list\"}' | jq -e 'select(.id==2) | [.result.skills[0].resources[].uri] | map(test(\"linked\")) | any | not'"
+  - name: "removing it clears the finding"
+    command: "rm -f skills/tisket-tips/linked.md && almanac check"
+    stdout: "no problems found\n"
