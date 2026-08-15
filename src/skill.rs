@@ -231,7 +231,9 @@ fn scan_directory(dir: &Path) -> Result<Vec<SkillEntry>, Error> {
 
     for entry in read_dir.flatten() {
         let path = entry.path();
-        if !path.is_dir() {
+        // A symlinked skill directory would otherwise be walked, and
+        // the library is content that somebody else may control.
+        if !std::fs::symlink_metadata(&path).is_ok_and(|m| m.is_dir()) {
             continue;
         }
         let skill_md = path.join("SKILL.md");
@@ -247,7 +249,10 @@ fn scan_directory(dir: &Path) -> Result<Vec<SkillEntry>, Error> {
 }
 
 fn parse_skill_md(skill_md: &Path, skill_dir: &Path) -> Result<SkillEntry, Error> {
-    let content = std::fs::read_to_string(skill_md)
+    // A skill directory can hold a symlinked SKILL.md pointing at a
+    // file outside the library. The guard refuses anything that is not
+    // a regular file.
+    let content = mdstore::store::read_document(skill_md)
         .map_err(|e| Error::General(format!("failed to read {}: {e}", skill_md.display())))?;
 
     // mdstore parses the frontmatter, so almanac, zettel, and tisket
