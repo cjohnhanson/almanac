@@ -128,6 +128,20 @@ implements it, and tools for one that does not. Trim the set when you
 know the client, because each tool definition costs context on every
 request.
 
+### Authentication
+
+A served library has none. The server answers whoever opens the
+connection.
+
+This is deliberate. Authentication belongs in front of the server, in
+something built for it: a reverse proxy that terminates TLS and checks
+a token or an identity provider. Three tools each carrying their own
+half-implementation would be three places to get it wrong.
+
+Bind to `127.0.0.1` for a client on this machine. To serve anybody
+else, put the server behind a proxy that authenticates, and let the
+proxy decide who reaches it.
+
 ### What a served library allows
 
 A served library is read-only until you say otherwise, because whoever
