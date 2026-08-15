@@ -172,11 +172,7 @@ pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Re
             sources: extra_sources,
         } => {
             let all_sources = merge_sources(sources, &extra_sources);
-            if skill::show(&name, root, &all_sources)? {
-                Ok(())
-            } else {
-                Err(Error::General(format!("skill '{name}' not found")))
-            }
+            cmd_show(root, &name, &all_sources)
         }
         Command::Index {
             sources: extra_sources,
@@ -353,8 +349,44 @@ fn manifest_sources(root: &Path) -> Vec<SkillSource> {
     sources
 }
 
+/// Print one skill, or one file beside it.
+///
+/// A skill with a directory on this machine goes through the directory
+/// path, which appends the references listing and reads one reference
+/// file by name. A library that lives in git has no directory to scan,
+/// and was invisible here while the MCP server served it in full, so
+/// the workspace reads it the way the server does.
+fn cmd_show(root: &Path, name: &str, sources: &[SkillSource]) -> Result<(), Error> {
+    if skill::show(name, root, sources)? {
+        return Ok(());
+    }
+    if let Ok(ws) = crate::workspace::Workspace::open(root) {
+        let (skill_name, file) = match name.split_once('/') {
+            Some((n, rest)) => (n, Some(rest.trim_start_matches("references/"))),
+            None => (name, None),
+        };
+        if let Some(view) = ws.resolve(skill_name) {
+            match file {
+                None => {
+                    print!("{}", ws.read_skill(&view)?);
+                    return Ok(());
+                }
+                Some(wanted) => {
+                    for (rel, bytes) in ws.skill_files(&view) {
+                        if rel == wanted || rel.ends_with(&format!("/{wanted}")) {
+                            print!("{}", String::from_utf8_lossy(&bytes));
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Err(Error::General(format!("skill '{name}' not found")))
+}
+
 fn cmd_list(root: &Path, sources: &[SkillSource]) {
-    let entries = skill::index(root, sources);
+    let entries = reachable_skills(root, sources);
     if entries.is_empty() {
         println!("No skills configured.");
         return;
@@ -365,8 +397,37 @@ fn cmd_list(root: &Path, sources: &[SkillSource]) {
 }
 
 fn cmd_index(root: &Path, sources: &[SkillSource]) {
-    let entries = skill::index(root, sources);
+    let entries = reachable_skills(root, sources);
     println!("{}", skill::format_index_json(&entries));
+}
+
+/// Every skill a command can reach, in precedence order.
+///
+/// The workspace answers first, because it reads a library wherever it
+/// lives: a directory on this machine, or a git tree in the cache. A
+/// directory scan sees only the first kind, and a git-declared library
+/// was then invisible to `list`, `show` and `index` while the MCP
+/// server served it in full. The curator must see what the agent sees.
+///
+/// Extra `--source` directories a host passes follow, and lose a name
+/// the workspace already holds.
+fn reachable_skills(root: &Path, sources: &[SkillSource]) -> Vec<skill::SkillEntry> {
+    let mut entries = Vec::new();
+    if let Ok(ws) = crate::workspace::Workspace::open(root) {
+        for view in ws.skills().iter().filter(|v| !v.shadowed) {
+            entries.push(skill::SkillEntry {
+                name: view.skill.name.clone(),
+                description: view.skill.description.clone(),
+                source: skill::SkillLocation::File(view.skill.rel_path.clone()),
+            });
+        }
+    }
+    for entry in skill::index(root, sources) {
+        if !entries.iter().any(|e| e.name == entry.name) {
+            entries.push(entry);
+        }
+    }
+    entries
 }
 
 fn cmd_docs(topic: Option<&str>, query: Option<&str>) -> Result<(), Error> {
