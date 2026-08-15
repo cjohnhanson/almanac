@@ -19,7 +19,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use mdstore::mcp::{Access, ServeConfig, Surface, digest_of};
+use mdstore::mcp::{ServeConfig, Surface, digest_of};
 use rmcp::model::{
     CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock, CustomResult,
     ErrorData as McpError, Implementation, InitializeResult, ListResourcesResult, ListToolsResult,
@@ -261,9 +261,7 @@ impl ServerHandler for AlmanacServer {
             "A curated library of agent skills. Surfaces: {}.",
             self.config.surfaces
         );
-        if self.config.access == Access::ReadOnly {
-            instructions.push_str(" This library is read-only.");
-        }
+        instructions.push_str(" This library is read-only.");
         if self.config.surfaces.has(Surface::Resources) && self.config.surfaces.has(Surface::Tools)
         {
             instructions.push_str(
@@ -430,7 +428,6 @@ async fn serve_http(config: ServeConfig, addr: &str) -> Result<(), Error> {
         StreamableHttpService, session::local::LocalSessionManager,
     };
 
-    let read_only = config.access == Access::ReadOnly;
     let server = AlmanacServer::new(config);
     let service = StreamableHttpService::new(
         move || Ok(server.clone()),
@@ -445,12 +442,9 @@ async fn serve_http(config: ServeConfig, addr: &str) -> Result<(), Error> {
     let bound = listener
         .local_addr()
         .map_err(|e| Error::General(format!("cannot read the address: {e}")))?;
-    // The operator needs to know what was actually opened, and whether
-    // it accepts writes, before a client connects.
-    eprintln!(
-        "almanac serving on http://{bound}/mcp ({})",
-        if read_only { "read-only" } else { "read-write" }
-    );
+    // The operator needs to know what was actually opened before a
+    // client connects.
+    eprintln!("almanac serving on http://{bound}/mcp (read-only)");
     axum::serve(listener, router)
         .with_graceful_shutdown(async {
             let _ = tokio::signal::ctrl_c().await;

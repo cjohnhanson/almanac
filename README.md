@@ -109,9 +109,11 @@ almanac serve --bind 127.0.0.1:8931    # for clients that connect
 
 The server offers the skills extension, readable resources, and tools.
 A client cannot be asked which it understands, so the surfaces are
-configuration: `--surfaces skills,resources,tools`. Tools are in every
-default, because every client can call one. A served library is
-read-only until `--access read-write` says otherwise.
+configuration: `--surfaces skills,resources,tools`. The default is
+`skills,tools`, because every client can call a tool. A served library
+is read-only, and no flag changes that: curating a skill is a decision
+a person makes at the command line. It also has no authentication, so
+bind it to `127.0.0.1` or put an authenticating proxy in front.
 
 Read `almanac docs composition` for the model.
 

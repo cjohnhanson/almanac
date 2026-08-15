@@ -102,7 +102,6 @@ without a copy on disk.
 almanac serve                                   # stdin and stdout
 almanac serve --bind 127.0.0.1:8931             # for clients that connect
 almanac serve --surfaces skills,resources,tools
-almanac serve --access read-write               # writes are refused by default
 ```
 
 ### Surfaces
@@ -144,8 +143,8 @@ proxy decide who reaches it.
 
 ### What a served library allows
 
-A served library is read-only until you say otherwise, because whoever
-opens the connection can read it. `--access read-write` allows the
-writes a remote caller may make. Accepting a skill is never one of
-them: trusting third-party content is a decision a person makes at the
-command line.
+A served library is read-only, and there is no flag that changes it.
+Almanac's writes are curation. `add` fetches a skill and prints its
+red-flag report; `accept` vendors it and pins the content. Both decide
+what the library vouches for, and that decision is a person's at the
+command line. A remote caller reads what the library already holds.
