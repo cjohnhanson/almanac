@@ -350,38 +350,19 @@ fn manifest_sources(root: &Path) -> Vec<SkillSource> {
     }
     // Each declared library follows this one, in declaration order, so
     // a name that two libraries hold resolves to the nearer library.
+    //
+    // The workspace supplies the directory, because it applies the
+    // containment guard to a dependency's own `library:` value. A
+    // second copy of this resolution here would not, and a dependency
+    // could then name any directory on the machine.
     if let Ok(ws) = crate::workspace::Workspace::open(root) {
-        for row in ws.store_members().iter().skip(1) {
-            if row.unavailable.is_some() {
-                continue;
-            }
-            if let Some(dir) = declared_library_dir(root, &row.alias) {
-                sources.push(SkillSource::Path { path: dir });
-            }
+        for dir in ws.declared_library_dirs() {
+            sources.push(SkillSource::Path { path: dir });
         }
     }
     sources
 }
 
-/// The directory a declared library keeps its skills in, when that
-/// library is a directory on this machine.
-fn declared_library_dir(root: &Path, alias: &str) -> Option<String> {
-    let config = mdstore::store::StoresConfig::load(root).ok()?;
-    let source = config.source(alias)?;
-    let mdstore::StoreSource::Path(p) = source else {
-        return None;
-    };
-    let base = if p.is_absolute() {
-        p.clone()
-    } else {
-        root.join(p)
-    };
-    let library = crate::manifest::Manifest::load(&base)
-        .map_or_else(|_| base.join("skills"), |m| m.library_dir(&base));
-    library
-        .is_dir()
-        .then(|| library.to_string_lossy().into_owned())
-}
 
 fn cmd_list(root: &Path, sources: &[SkillSource]) {
     let entries = skill::index(root, sources);
