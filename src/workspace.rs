@@ -446,6 +446,46 @@ impl Workspace {
         findings
     }
 
+    /// The files beside a skill's SKILL.md, each with its bytes.
+    ///
+    /// They are resolved against the library that holds the skill, not
+    /// against this one. Resolving against this library read a
+    /// different library's files, or none, and the digest then covered
+    /// bytes that the skill does not contain.
+    #[must_use]
+    pub fn skill_files(&self, view: &View<'_>) -> Vec<(String, Vec<u8>)> {
+        let member = &self.snapshot.graph.members[view.id.member];
+        let Some(content) = member.content.as_ref() else {
+            return Vec::new();
+        };
+        let Some(parent) = std::path::Path::new(&view.skill.rel_path).parent() else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        match content {
+            StoreContent::Dir(root) => {
+                let skill_dir = root.join(parent);
+                collect_files(&skill_dir, &skill_dir, &mut out);
+            }
+            StoreContent::GitTree { cache, rev, .. } => {
+                let prefix = parent.to_string_lossy().to_string();
+                if let Ok(paths) = mdstore::git::list_tree(cache, rev, &prefix) {
+                    for name in paths {
+                        if name == "SKILL.md" || name.starts_with('.') {
+                            continue;
+                        }
+                        let full = format!("{prefix}/{name}");
+                        if let Ok(text) = mdstore::git::show(cache, rev, &full) {
+                            out.push((name, text.into_bytes()));
+                        }
+                    }
+                }
+            }
+        }
+        out.sort_by(|a, b| a.0.cmp(&b.0));
+        out
+    }
+
     /// The full text of a skill, from whichever library won its name.
     pub fn read_skill(&self, view: &View<'_>) -> Result<String, Error> {
         let member = &self.snapshot.graph.members[view.id.member];
@@ -456,6 +496,38 @@ impl Workspace {
         content
             .read(&view.skill.rel_path)
             .map_err(|e| Error::General(e.to_string()))
+    }
+}
+
+/// Walk a skill directory, skipping links and dot entries.
+fn collect_files(base: &std::path::Path, dir: &std::path::Path, out: &mut Vec<(String, Vec<u8>)>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        // A library is content somebody else may control, so a link is
+        // skipped rather than followed.
+        if file_type.is_symlink() {
+            continue;
+        }
+        if file_type.is_dir() {
+            collect_files(base, &path, out);
+            continue;
+        }
+        let Ok(rel) = path.strip_prefix(base) else {
+            continue;
+        };
+        let rel = rel.to_string_lossy().to_string();
+        if rel == "SKILL.md" || rel.starts_with('.') {
+            continue;
+        }
+        if let Ok(bytes) = std::fs::read(&path) {
+            out.push((rel, bytes));
+        }
     }
 }
 

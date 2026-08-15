@@ -16,7 +16,7 @@
 //!   `almanac_check`. Every client can call a tool, so this is the
 //!   floor that a served library can rely on.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use mdstore::mcp::{Access, ServeConfig, Surface, digest_of};
@@ -86,7 +86,7 @@ impl AlmanacServer {
                 format!("{base}/SKILL.md"),
                 digest_of(text.as_bytes()),
             )];
-            for (rel, bytes) in skill_files(self.root(), view)? {
+            for (rel, bytes) in ws.skill_files(view) {
                 resources.push((format!("{base}/{rel}"), digest_of(&bytes)));
             }
             entries.push(SkillEntry {
@@ -124,9 +124,10 @@ impl AlmanacServer {
         if sub == "SKILL.md" {
             return ws.read_skill(&view);
         }
-        // A file beside the SKILL.md. The path is checked against the
-        // skill's own directory, so a URI cannot reach outside it.
-        for (rel, bytes) in skill_files(self.root(), &view)? {
+        // A file beside the SKILL.md, resolved against the library
+        // that holds the skill. The name is matched against that
+        // library's own files, so a URI cannot reach outside it.
+        for (rel, bytes) in ws.skill_files(&view) {
             if rel == sub {
                 return String::from_utf8(bytes)
                     .map_err(|e| Error::General(format!("{uri} is not text: {e}")));
@@ -204,56 +205,6 @@ impl AlmanacServer {
             other => Err(Error::General(format!("no tool named '{other}'"))),
         }
     }
-}
-
-/// The files of one skill, beside its SKILL.md, each with its bytes.
-///
-/// Only a library on this machine has files to walk. A remote library
-/// answers from a cache, which is a directory too, so this covers both.
-fn skill_files(
-    root: &Path,
-    view: &crate::workspace::View<'_>,
-) -> Result<Vec<(String, Vec<u8>)>, Error> {
-    let skill_dir = match PathBuf::from(&view.skill.rel_path).parent() {
-        Some(dir) => root.join(dir),
-        None => return Ok(Vec::new()),
-    };
-    let mut out = Vec::new();
-    collect(&skill_dir, &skill_dir, &mut out)?;
-    out.sort_by(|a, b| a.0.cmp(&b.0));
-    Ok(out)
-}
-
-fn collect(base: &Path, dir: &Path, out: &mut Vec<(String, Vec<u8>)>) -> Result<(), Error> {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return Ok(());
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let Ok(file_type) = entry.file_type() else {
-            continue;
-        };
-        // A symlink is skipped rather than followed: a library is
-        // third-party content, and a link could name a file outside it.
-        if file_type.is_symlink() {
-            continue;
-        }
-        if file_type.is_dir() {
-            collect(base, &path, out)?;
-            continue;
-        }
-        let Ok(rel) = path.strip_prefix(base) else {
-            continue;
-        };
-        let rel = rel.to_string_lossy().to_string();
-        if rel == "SKILL.md" || rel.starts_with('.') {
-            continue;
-        }
-        if let Ok(bytes) = std::fs::read(&path) {
-            out.push((rel, bytes));
-        }
-    }
-    Ok(())
 }
 
 fn empty_schema() -> Map<String, Value> {
@@ -513,6 +464,7 @@ async fn serve_http(config: ServeConfig, addr: &str) -> Result<(), Error> {
 mod tests {
     use super::*;
     use mdstore::mcp::Surfaces;
+    use std::path::PathBuf;
 
     fn fixture() -> PathBuf {
         let base = std::env::temp_dir().join(format!(
