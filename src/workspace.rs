@@ -104,15 +104,39 @@ impl DocumentSource for SkillSource {
 }
 
 /// The library directory a store's manifest names, or the default.
+///
+/// A dependency's manifest is content somebody else controls, so the
+/// value it names must stay inside that store. Without the guard, a
+/// dependency saying `library: /somewhere` has its skills listed, read,
+/// and served from a directory that has nothing to do with it.
 fn library_dir_of(content: &StoreContent) -> String {
-    if content.exists("almanac.yml")
+    let configured = if content.exists("almanac.yml")
         && let Ok(text) = content.read("almanac.yml")
         && let Ok(value) = serde_yml::from_str::<serde_yml::Value>(&text)
         && let Some(dir) = value.get("library").and_then(|d| d.as_str())
     {
-        return dir.to_string();
+        dir.to_string()
+    } else {
+        return "skills".to_string();
+    };
+
+    match content.dir() {
+        // A directory on this machine: resolve it and check that it
+        // stays inside the store.
+        Some(root) => match mdstore::store::document_dir(root, &configured) {
+            Ok(_) => configured,
+            Err(_) => "skills".to_string(),
+        },
+        // A git tree holds no symlink to follow, so the text alone
+        // decides. A value that climbs out names nothing in the tree.
+        None => {
+            if configured.starts_with('/') || configured.contains("..") {
+                "skills".to_string()
+            } else {
+                configured
+            }
+        }
     }
-    "skills".to_string()
 }
 
 /// The subdirectories of a library directory.
@@ -123,7 +147,10 @@ fn subdirectories(content: &StoreContent, dir_name: &str) -> Vec<String> {
         };
         let mut names: Vec<String> = entries
             .flatten()
-            .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
+            // file_type() on the dirent does not follow a link, so a
+            // symlinked skill directory is skipped rather than walked
+            // into somebody else's filesystem.
+            .filter(|e| e.file_type().is_ok_and(|t| t.is_dir() && !t.is_symlink()))
             .filter_map(|e| e.file_name().to_str().map(std::string::ToString::to_string))
             .filter(|n| !n.starts_with('.'))
             .collect();
@@ -300,6 +327,30 @@ impl Workspace {
     #[must_use]
     pub fn unshareable(&self, root: &Path) -> Vec<(String, String)> {
         self.snapshot.graph.config(0).unshareable(root)
+    }
+
+    /// The directory each declared library keeps its skills in, in
+    /// precedence order, for a caller that scans directories.
+    ///
+    /// The value comes from the guarded resolution, so a dependency
+    /// that names a directory outside itself is not returned.
+    #[must_use]
+    pub fn declared_library_dirs(&self) -> Vec<String> {
+        self.snapshot
+            .graph
+            .members
+            .iter()
+            .skip(1)
+            .filter_map(|m| {
+                let content = m.content.as_ref()?;
+                let root = content.dir()?;
+                let dir_name = library_dir_of(content);
+                let joined = mdstore::store::document_dir(root, &dir_name).ok()?;
+                joined
+                    .is_dir()
+                    .then(|| joined.to_string_lossy().into_owned())
+            })
+            .collect()
     }
 
     /// One row for each library in the closure.
