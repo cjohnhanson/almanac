@@ -81,6 +81,16 @@ impl DocumentSource for SkillSource {
                 Ok(doc) => {
                     let fm = doc.frontmatter;
                     let name = fm.name.unwrap_or_else(|| skill_dir.clone());
+                    // The name identifies the skill everywhere: it is
+                    // the id a tool asks for, the authority of a
+                    // skill:// URI, and the directory a vendored copy
+                    // lives in. A published library supplies it, so a
+                    // name holding a separator would collide with
+                    // another skill's file URIs.
+                    if !mdstore::is_plain_stem(&name) {
+                        skipped.push(format!("{rel} (the name `{name}` is not a plain name)"));
+                        continue;
+                    }
                     skills.push(Entry {
                         id: name.clone(),
                         doc: SkillDoc {

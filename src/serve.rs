@@ -110,6 +110,25 @@ impl AlmanacServer {
     }
 
     /// The text of one file named by a `skill://` URI.
+    /// Run a closure that touches the filesystem off the async
+    /// workers.
+    ///
+    /// Every surface here reads files, and a git-backed library reads
+    /// git objects. On the async pool that work blocks the runtime, so
+    /// one slow call delays every other client. `call_tool` got this
+    /// treatment; resources and the skills extension did not, and they
+    /// read exactly the same things.
+    async fn blocking<T, F>(&self, work: F) -> Result<T, McpError>
+    where
+        T: Send + 'static,
+        F: FnOnce(Self) -> Result<T, McpError> + Send + 'static,
+    {
+        let this = self.clone();
+        tokio::task::spawn_blocking(move || work(this))
+            .await
+            .map_err(|e| McpError::internal_error(format!("the call did not finish: {e}"), None))?
+    }
+
     fn read_uri(&self, uri: &str) -> Result<String, Error> {
         let rest = uri
             .strip_prefix(&format!("{SCHEME}://"))
@@ -184,11 +203,16 @@ impl AlmanacServer {
                 Ok(serde_json::to_string_pretty(&listed).unwrap_or_default())
             }
             "almanac_get_skill" => {
-                let skill = args
-                    .get("name")
-                    .and_then(Value::as_str)
-                    .ok_or_else(|| Error::General("name is required".into()))?;
-                let uri = args.get("file").and_then(Value::as_str).map_or_else(
+                // The shared accessors separate three answers: absent,
+                // a string, and the wrong type. Reading an argument
+                // with as_str alone turned a mistyped `file` into a
+                // request for the SKILL.md, which is a different
+                // document reported as success.
+                let skill = mdstore::mcp::required_str(args, name, "name")
+                    .map_err(|e| Error::General(e.to_string()))?;
+                let file = mdstore::mcp::optional_str(args, "file")
+                    .map_err(|e| Error::General(e.to_string()))?;
+                let uri = file.map_or_else(
                     || format!("{SCHEME}://{skill}/SKILL.md"),
                     |file| format!("{SCHEME}://{skill}/{file}"),
                 );
@@ -327,18 +351,23 @@ impl ServerHandler for AlmanacServer {
         if !self.config.surfaces.has(Surface::Resources) {
             return Ok(ListResourcesResult::default());
         }
-        let entries = self.skill_entries().map_err(|e| to_mcp_error(&e))?;
-        let mut resources = Vec::new();
-        for entry in &entries {
-            for (uri, _) in &entry.resources {
-                let mut resource = Resource::new(
-                    uri.clone(),
-                    uri.rsplit('/').next().unwrap_or(uri).to_string(),
-                );
-                resource.mime_type = Some("text/markdown".into());
-                resources.push(resource);
-            }
-        }
+        let resources = self
+            .blocking(|this| {
+                let entries = this.skill_entries().map_err(|e| to_mcp_error(&e))?;
+                let mut resources = Vec::new();
+                for entry in &entries {
+                    for (uri, _) in &entry.resources {
+                        let mut resource = Resource::new(
+                            uri.clone(),
+                            uri.rsplit('/').next().unwrap_or(uri).to_string(),
+                        );
+                        resource.mime_type = Some("text/markdown".into());
+                        resources.push(resource);
+                    }
+                }
+                Ok(resources)
+            })
+            .await?;
         Ok(ListResourcesResult::with_all_items(resources))
     }
 
@@ -353,7 +382,10 @@ impl ServerHandler for AlmanacServer {
                 None,
             ));
         }
-        let text = self.read_uri(&request.uri).map_err(|e| to_mcp_error(&e))?;
+        let uri = request.uri.clone();
+        let text = self
+            .blocking(move |this| this.read_uri(&uri).map_err(|e| to_mcp_error(&e)))
+            .await?;
         Ok(ReadResourceResult::new(vec![ResourceContents::text(text, request.uri)]).into())
     }
 
@@ -372,10 +404,13 @@ impl ServerHandler for AlmanacServer {
         }
         match request.method.as_str() {
             "skills/list" => {
-                let entries = self.skill_entries().map_err(|e| to_mcp_error(&e))?;
-                Ok(CustomResult::new(json!({
-                    "skills": entries.iter().map(Self::entry_json).collect::<Vec<_>>(),
-                })))
+                let skills = self
+                    .blocking(|this| {
+                        let entries = this.skill_entries().map_err(|e| to_mcp_error(&e))?;
+                        Ok(entries.iter().map(Self::entry_json).collect::<Vec<_>>())
+                    })
+                    .await?;
+                Ok(CustomResult::new(json!({ "skills": skills })))
             }
             "skills/get" => {
                 let uri = request
@@ -384,11 +419,17 @@ impl ServerHandler for AlmanacServer {
                     .and_then(|p| p.get("uri"))
                     .and_then(Value::as_str)
                     .ok_or_else(|| McpError::invalid_params("uri is required", None))?;
-                let entries = self.skill_entries().map_err(|e| to_mcp_error(&e))?;
-                let entry = entries.iter().find(|e| e.uri == uri).ok_or_else(|| {
-                    McpError::invalid_params(format!("no skill at {uri}"), None)
-                })?;
-                Ok(CustomResult::new(json!({ "skill": Self::entry_json(entry) })))
+                let uri = uri.to_string();
+                let skill = self
+                    .blocking(move |this| {
+                        let entries = this.skill_entries().map_err(|e| to_mcp_error(&e))?;
+                        let entry = entries.iter().find(|e| e.uri == uri).ok_or_else(|| {
+                            McpError::invalid_params(format!("no skill at {uri}"), None)
+                        })?;
+                        Ok(Self::entry_json(entry))
+                    })
+                    .await?;
+                Ok(CustomResult::new(json!({ "skill": skill })))
             }
             other => Err(McpError::invalid_request(
                 format!("unknown method {other}"),
