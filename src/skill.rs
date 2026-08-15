@@ -29,7 +29,7 @@ struct SkillFrontmatter {
     #[serde(default)]
     description: Option<String>,
     #[serde(flatten)]
-    extra: serde_yml::Mapping,
+    extra: yaml_serde::Mapping,
 }
 
 /// Scan the configured sources and return the skills a command can
