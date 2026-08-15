@@ -66,7 +66,17 @@ impl DocumentSource for SkillSource {
             if !content.exists(&rel) {
                 continue;
             }
-            let text = content.read(&rel)?;
+            // One unreadable skill never takes down a library. A bare
+            // `?` here is caught one level up, where the whole member
+            // becomes an empty document list, so a served library
+            // answered `[]` for one stray byte.
+            let text = match content.read(&rel) {
+                Ok(t) => t,
+                Err(e) => {
+                    skipped.push(format!("{rel} ({e})"));
+                    continue;
+                }
+            };
             match mdstore::document::parse::<Frontmatter>(&text) {
                 Ok(doc) => {
                     let fm = doc.frontmatter;
