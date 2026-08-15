@@ -179,18 +179,15 @@ pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Re
             md,
             max_bytes,
         } => {
+            // This payload is what an agent reads before it asks for
+            // anything. It once covered only the manifest's own
+            // library, so every declared library was missing from the
+            // one listing the agent sees.
+            let all_sources = merge_sources(sources, &extra_sources);
             if md {
-                if extra_sources.is_empty() {
-                    print!("{}", crate::ops::index_md(root, max_bytes)?);
-                } else {
-                    let all_sources = merge_sources(sources, &extra_sources);
-                    print!(
-                        "{}",
-                        crate::ops::index_md_sources(root, &all_sources, max_bytes)
-                    );
-                }
+                let entries = reachable_skills(root, &all_sources);
+                print!("{}", crate::ops::format_index_md(&entries, max_bytes));
             } else {
-                let all_sources = merge_sources(sources, &extra_sources);
                 cmd_index(root, &all_sources);
             }
             Ok(())
@@ -326,13 +323,13 @@ pub fn run(args: Args) -> Result<(), Error> {
 /// A directory with no manifest contributes nothing.
 fn manifest_sources(root: &Path) -> Vec<SkillSource> {
     let mut sources = Vec::new();
-    if let Ok(manifest) = crate::manifest::Manifest::load(root) {
-        let library = manifest.library_dir(root);
-        if library.is_dir() {
-            sources.push(SkillSource::Path {
-                path: library.to_string_lossy().into_owned(),
-            });
-        }
+    if let Ok(manifest) = crate::manifest::Manifest::load(root)
+        && let Ok(library) = manifest.library_dir(root)
+        && library.is_dir()
+    {
+        sources.push(SkillSource::Path {
+            path: library.to_string_lossy().into_owned(),
+        });
     }
     // Each declared library follows this one, in declaration order, so
     // a name that two libraries hold resolves to the nearer library.
