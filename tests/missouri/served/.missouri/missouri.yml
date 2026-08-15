@@ -45,9 +45,14 @@ assertions:
   - name: "check answers through the server"
     command: "mcp 'almanac serve' '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"almanac_check\",\"arguments\":{}}}' | jq -r 'select(.id==2) | .result.content[0].text' | grep -q 'no problems found'"
 
-  # A served library is read-only, and accepting a skill is never served
-  - name: "no tool vendors or accepts a skill, in any access mode"
-    command: "mcp 'almanac serve --access read-write' '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}' | jq -e 'select(.id==2) | [.result.tools[].name] | map(test(\"add|accept|remove|sync\")) | any | not'"
+  # A served library is read-only, and no flag changes that
+  - name: "no tool vendors or accepts a skill"
+    command: "mcp 'almanac serve' '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}' | jq -e 'select(.id==2) | [.result.tools[].name] | map(test(\"add|accept|remove|sync\")) | any | not'"
+  - name: "serve takes no access flag, so read-write cannot be asked for"
+    command: "almanac serve --access read-write < /dev/null"
+    should_fail: true
+  - name: "the server tells the client the library is read-only"
+    command: "mcp 'almanac serve' | jq -r 'select(.id==1) | .result.instructions' | grep -q 'read-only'"
   - name: "the library is unchanged after being served"
     command: "almanac sync --check"
 

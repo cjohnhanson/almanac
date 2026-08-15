@@ -43,7 +43,7 @@ struct Frontmatter {
     #[serde(default)]
     requires: Vec<String>,
     #[serde(flatten)]
-    extra: serde_yml::Mapping,
+    extra: yaml_serde::Mapping,
 }
 
 /// Reads the skills of one library.
@@ -112,7 +112,7 @@ impl DocumentSource for SkillSource {
 fn library_dir_of(content: &StoreContent) -> String {
     let configured = if content.exists("almanac.yml")
         && let Ok(text) = content.read("almanac.yml")
-        && let Ok(value) = serde_yml::from_str::<serde_yml::Value>(&text)
+        && let Ok(value) = yaml_serde::from_str::<yaml_serde::Value>(&text)
         && let Some(dir) = value.get("library").and_then(|d| d.as_str())
     {
         dir.to_string()

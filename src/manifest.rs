@@ -86,12 +86,12 @@ impl Manifest {
     pub fn load(dir: &Path) -> Result<Self, ManifestError> {
         let path = dir.join(MANIFEST_NAME);
         let bytes = std::fs::read_to_string(&path).map_err(|_| ManifestError::NotFound(path))?;
-        serde_yml::from_str(&bytes).map_err(|e| ManifestError::Invalid(e.to_string()))
+        yaml_serde::from_str(&bytes).map_err(|e| ManifestError::Invalid(e.to_string()))
     }
 
     pub fn save(&self, dir: &Path) -> Result<(), ManifestError> {
         let rendered =
-            serde_yml::to_string(self).map_err(|e| ManifestError::Invalid(e.to_string()))?;
+            yaml_serde::to_string(self).map_err(|e| ManifestError::Invalid(e.to_string()))?;
         let path = dir.join(MANIFEST_NAME);
         let tmp = dir.join(format!("{MANIFEST_NAME}.tmp"));
         std::fs::write(&tmp, rendered).map_err(|e| ManifestError::Io(e.to_string()))?;
