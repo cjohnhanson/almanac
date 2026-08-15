@@ -301,7 +301,15 @@ impl ServerHandler for AlmanacServer {
             return Err(McpError::invalid_request("tools are not served here", None));
         }
         let args = request.arguments.unwrap_or_default();
-        match self.call(&request.name, &args) {
+        // Every tool reads files, and a git-backed library reads git
+        // objects. On the async worker pool that work blocks the
+        // runtime, so one slow call delays every other client.
+        let this = self.clone();
+        let name = request.name.to_string();
+        let called = tokio::task::spawn_blocking(move || this.call(&name, &args))
+            .await
+            .map_err(|e| McpError::internal_error(format!("the call did not finish: {e}"), None))?;
+        match called {
             Ok(text) => Ok(CallToolResult::success(vec![ContentBlock::text(text)]).into()),
             // A failure the caller can act on comes back as tool
             // content, not a protocol error, so the model can read it.
