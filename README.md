@@ -51,8 +51,10 @@ use it, for an agent's context; it depends only on the binary version.
 ## Sources
 
 - `github:owner/repo` (or bare `owner/repo`) — pinned by commit and hash
-- `git:<url>` — any git server. almanac tries a sha fetch, then the
-  recorded ref, then a full clone.
+- `git:<url>` — any git server over https, git://, or a local path.
+  almanac tries a sha fetch, then the recorded ref, then a full fetch,
+  all in-process on gix; no git program runs. An ssh URL is refused,
+  because gix would spawn ssh for it.
 - `dev:<path>` — a local snapshot of a skill you develop alongside.
   `sync --check` skips it and reports drift as information.
 

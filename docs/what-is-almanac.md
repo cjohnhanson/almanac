@@ -35,7 +35,7 @@ Almanac vendors skills into the library from three kinds of source:
 
 - `github:owner/repo` — a GitHub repository, pinned to a commit and a
   content hash
-- `git:<url>` — any git server, pinned the same way
+- `git:<url>` — any git server over https, pinned the same way
 - `dev:<path>` — a local snapshot of a skill you develop alongside
 
 ## How agents use it

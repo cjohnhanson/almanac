@@ -1,17 +1,21 @@
 //! Fetches sources and vendors skill trees into the library.
 //!
-//! Almanac runs the git CLI for every git operation. To fetch a pinned
-//! commit it tries a depth-1 sha fetch, which GitHub permits. It then
-//! tries a full fetch of the recorded ref. It then tries a full clone.
-//! It reports the path that worked. A copy honors the hash deny-list
+//! Every git operation runs in-process on gix; no git program is
+//! spawned. To fetch a pinned commit from a network source it tries a
+//! depth-1 fetch of the sha, which GitHub permits. It then tries a fetch
+//! of the recorded ref. It then tries a full fetch. It reports the path
+//! that worked. A local repository is read in place, at the rev, with no
+//! fetch at all. A copy honors the hash deny-list
 //! and refuses a symlink that points outside the tree. It writes an
 //! `.almanac-origin` stamp into the vendored directory, so the managed
 //! set is explicit.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::sync::atomic::AtomicBool;
 
-use crate::hash::{denied, hash_tree, HashError};
+use gix::bstr::ByteSlice as _;
+
+use crate::hash::{HashError, denied, hash_tree};
 use crate::manifest::{Entry, ORIGIN_STAMP};
 
 #[derive(Debug)]
@@ -67,22 +71,125 @@ pub fn locate(source: &str) -> Result<Located, VendorError> {
     Err(VendorError::BadSource(source.to_string()))
 }
 
-fn git(dir: &Path, args: &[&str]) -> Result<String, VendorError> {
-    let out = Command::new("git")
-        .current_dir(dir)
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .args(args)
-        .output()
-        .map_err(|e| VendorError::Git(e.to_string()))?;
-    if out.status.success() {
-        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
-    } else {
-        Err(VendorError::Git(format!(
-            "`git {}`: {}",
-            args.join(" "),
-            String::from_utf8_lossy(&out.stderr).trim()
-        )))
+fn gix_err(context: &str, e: impl std::fmt::Display) -> VendorError {
+    VendorError::Git(format!("{context}: {e}"))
+}
+
+/// Where a URL leads. gix's file transport would spawn git-upload-pack,
+/// so a local repository is opened in place. ssh would spawn ssh, so it
+/// is refused with the fix in the message.
+enum Reach {
+    Local(PathBuf),
+    Network(gix::Url),
+}
+
+fn reach(url: &str) -> Result<Reach, VendorError> {
+    let parsed = gix::url::parse(gix::bstr::BStr::new(url))
+        .map_err(|e| VendorError::Git(format!("{url}: {e}")))?;
+    match parsed.scheme {
+        gix::url::Scheme::File => Ok(Reach::Local(
+            gix::path::from_bstr(parsed.path.as_bstr()).into_owned(),
+        )),
+        gix::url::Scheme::Http | gix::url::Scheme::Https | gix::url::Scheme::Git => {
+            Ok(Reach::Network(parsed))
+        }
+        gix::url::Scheme::Ssh => Err(VendorError::Git(format!(
+            "{url}: an ssh transport needs an ssh process, and almanac spawns none; use https"
+        ))),
+        gix::url::Scheme::Ext(s) => Err(VendorError::Git(format!("{url}: unsupported scheme {s}"))),
     }
+}
+
+fn open_local(path: &Path) -> Result<gix::Repository, VendorError> {
+    gix::open_opts(path, gix::open::Options::isolated())
+        .map_err(|e| gix_err(&format!("open {}", path.display()), e))
+}
+
+/// Fetch into `bare` what `spec` names, from `url`. `depth` limits the
+/// history for a sha fetch. Returns whether the fetch succeeded; a
+/// failure is a normal branch of the try order, not an error.
+fn fetch_into(
+    bare: &gix::Repository,
+    url: &gix::Url,
+    spec: &str,
+    depth: Option<u32>,
+) -> Result<(), VendorError> {
+    let remote = bare
+        .remote_at(url.clone())
+        .map_err(|e| gix_err("remote", e))?
+        .with_refspecs([spec], gix::remote::Direction::Fetch)
+        .map_err(|e| gix_err("refspec", e))?
+        .with_fetch_tags(gix::remote::fetch::Tags::None);
+    let mut prepare = remote
+        .connect(gix::remote::Direction::Fetch)
+        .map_err(|e| gix_err("connect", e))?
+        .with_credentials(mdstore::git::credential_fn())
+        .prepare_fetch(
+            gix::progress::Discard,
+            gix::remote::ref_map::Options::default(),
+        )
+        .map_err(|e| gix_err("fetch", e))?;
+    if let Some(d) = depth.and_then(std::num::NonZeroU32::new) {
+        prepare = prepare.with_shallow(gix::remote::fetch::Shallow::DepthAtRemote(d));
+    }
+    prepare
+        .receive(gix::progress::Discard, &AtomicBool::new(false))
+        .map_err(|e| gix_err("fetch", e))?;
+    Ok(())
+}
+
+/// Write the tree of `commit` under `into`: files with their mode,
+/// symlinks as symlinks. Submodule entries are skipped.
+fn write_tree(
+    repo: &gix::Repository,
+    commit: gix::ObjectId,
+    into: &Path,
+) -> Result<(), VendorError> {
+    let commit = repo.find_commit(commit).map_err(|e| gix_err("commit", e))?;
+    let tree = commit.tree().map_err(|e| gix_err("tree", e))?;
+    write_tree_at(repo, &tree, into)
+}
+
+fn write_tree_at(
+    repo: &gix::Repository,
+    tree: &gix::Tree<'_>,
+    into: &Path,
+) -> Result<(), VendorError> {
+    let io = |e: std::io::Error| VendorError::Io(e.to_string());
+    std::fs::create_dir_all(into).map_err(io)?;
+    for entry in tree.iter() {
+        let entry = entry.map_err(|e| gix_err("tree entry", e))?;
+        let name = gix::path::from_bstr(entry.filename()).into_owned();
+        let target = into.join(&name);
+        let mode = entry.mode();
+        if mode.is_tree() {
+            let sub = repo
+                .find_tree(entry.oid().to_owned())
+                .map_err(|e| gix_err("subtree", e))?;
+            write_tree_at(repo, &sub, &target)?;
+        } else if mode.is_link() {
+            let blob = repo
+                .find_blob(entry.oid().to_owned())
+                .map_err(|e| gix_err("symlink", e))?;
+            let dest = gix::path::from_bstr(blob.data.as_bstr()).into_owned();
+            #[cfg(unix)]
+            std::os::unix::fs::symlink(&dest, &target).map_err(io)?;
+            #[cfg(not(unix))]
+            std::fs::write(&target, &blob.data).map_err(io)?;
+        } else if mode.is_blob() {
+            let blob = repo
+                .find_blob(entry.oid().to_owned())
+                .map_err(|e| gix_err("blob", e))?;
+            std::fs::write(&target, &blob.data).map_err(io)?;
+            #[cfg(unix)]
+            if mode.is_executable() {
+                use std::os::unix::fs::PermissionsExt as _;
+                std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o755))
+                    .map_err(io)?;
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Fetch `rev` from `url` into a temporary checkout. Returns the
@@ -94,49 +201,131 @@ pub fn fetch_rev(
     r#ref: Option<&str>,
 ) -> Result<(tempdir::TempDirHandle, &'static str), VendorError> {
     let tmp = tempdir::create("almanac-fetch")?;
-    git(&tmp.path, &["init", "-q"])?;
-    git(&tmp.path, &["remote", "add", "origin", url])?;
-
-    if git(&tmp.path, &["fetch", "-q", "--depth", "1", "origin", rev]).is_ok() {
-        git(&tmp.path, &["checkout", "-q", "FETCH_HEAD"])?;
-        return Ok((tmp, "sha-fetch"));
-    }
-    if let Some(r) = r#ref
-        && git(&tmp.path, &["fetch", "-q", "origin", r]).is_ok()
-            && git(&tmp.path, &["checkout", "-q", rev]).is_ok()
-        {
-            return Ok((tmp, "ref-fetch"));
+    match reach(url)? {
+        Reach::Local(path) => {
+            let repo = open_local(&path)?;
+            let id = repo
+                .rev_parse_single(format!("{rev}^{{commit}}").as_str())
+                .map_err(|e| gix_err(&format!("{rev} in {}", path.display()), e))?
+                .detach();
+            write_tree(&repo, id, &tmp.path)?;
+            Ok((tmp, "local-read"))
         }
-    git(&tmp.path, &["fetch", "-q", "origin"])?;
-    git(&tmp.path, &["checkout", "-q", rev])?;
-    Ok((tmp, "full-fetch"))
+        Reach::Network(remote) => {
+            // The bare object store lives beside the checkout, in its own
+            // temp dir, and goes with it.
+            let bare_dir = tempdir::create("almanac-fetch-objects")?;
+            let bare = gix::init_bare(&bare_dir.path).map_err(|e| gix_err("init", e))?;
+            let want = format!("+{rev}:refs/almanac/want");
+            let how = if fetch_into(&bare, &remote, &want, Some(1)).is_ok() {
+                "sha-fetch"
+            } else if r#ref.is_some_and(|r| {
+                fetch_into(&bare, &remote, &format!("+{r}:refs/almanac/ref"), None).is_ok()
+            }) {
+                "ref-fetch"
+            } else {
+                fetch_into(&bare, &remote, "+refs/heads/*:refs/heads/*", None)?;
+                "full-fetch"
+            };
+            let id = bare
+                .rev_parse_single(format!("{rev}^{{commit}}").as_str())
+                .map_err(|e| gix_err(&format!("{rev} on {url}"), e))?
+                .detach();
+            write_tree(&bare, id, &tmp.path)?;
+            drop(bare);
+            drop(bare_dir);
+            Ok((tmp, how))
+        }
+    }
 }
 
 /// Resolve a ref, or the remote HEAD, to a commit sha. Returns an error
 /// when nothing resolves. Almanac never works from an unknown base.
 pub fn resolve_remote(url: &str, r#ref: Option<&str>) -> Result<(String, String), VendorError> {
-    let tmp = tempdir::create("almanac-resolve")?;
-    if let Some(r) = r#ref {
-        let out = git(&tmp.path, &["ls-remote", url, r])?;
-        if let Some(sha) = out.split_whitespace().next().filter(|s| !s.is_empty()) {
-            return Ok((sha.to_string(), r.to_string()));
+    match reach(url)? {
+        Reach::Local(path) => {
+            let repo = open_local(&path)?;
+            if let Some(r) = r#ref {
+                let id = repo
+                    .rev_parse_single(format!("{r}^{{commit}}").as_str())
+                    .map_err(|_| VendorError::Git(format!("ref `{r}` not found on {url}")))?;
+                return Ok((id.to_string(), r.to_string()));
+            }
+            let branch = repo
+                .head_name()
+                .ok()
+                .flatten()
+                .map(|n| n.shorten().to_string())
+                .ok_or_else(|| {
+                    VendorError::Git(format!("cannot resolve default branch of {url}"))
+                })?;
+            let sha = repo
+                .head_id()
+                .map_err(|_| VendorError::Git(format!("cannot resolve HEAD of {url}")))?
+                .to_string();
+            Ok((sha, branch))
         }
-        return Err(VendorError::Git(format!("ref `{r}` not found on {url}")));
+        Reach::Network(remote) => {
+            let bare_dir = tempdir::create("almanac-resolve")?;
+            let bare = gix::init_bare(&bare_dir.path).map_err(|e| gix_err("init", e))?;
+            let remote = bare.remote_at(remote).map_err(|e| gix_err("remote", e))?;
+            let map = remote
+                .connect(gix::remote::Direction::Fetch)
+                .map_err(|e| gix_err("connect", e))?
+                .with_credentials(mdstore::git::credential_fn())
+                .ref_map(
+                    gix::progress::Discard,
+                    gix::remote::ref_map::Options::default(),
+                )
+                .map_err(|e| gix_err("ls-remote", e))?;
+            // The advertised refs, as `git ls-remote --symref` lists them.
+            let (map, _handshake) = map;
+            let refs = &map.remote_refs;
+            let find = |name: &str| -> Option<String> {
+                refs.iter().find_map(|r| match r {
+                    gix::protocol::handshake::Ref::Direct {
+                        full_ref_name,
+                        object,
+                    } if full_ref_name == name => Some(object.to_string()),
+                    gix::protocol::handshake::Ref::Peeled {
+                        full_ref_name, tag, ..
+                    } if full_ref_name == name => Some(tag.to_string()),
+                    gix::protocol::handshake::Ref::Symbolic {
+                        full_ref_name,
+                        object,
+                        ..
+                    } if full_ref_name == name => Some(object.to_string()),
+                    _ => None,
+                })
+            };
+            if let Some(r) = r#ref {
+                let sha = find(r)
+                    .or_else(|| find(&format!("refs/heads/{r}")))
+                    .or_else(|| find(&format!("refs/tags/{r}")))
+                    .ok_or_else(|| VendorError::Git(format!("ref `{r}` not found on {url}")))?;
+                return Ok((sha, r.to_string()));
+            }
+            let (sha, branch) = refs
+                .iter()
+                .find_map(|r| match r {
+                    gix::protocol::handshake::Ref::Symbolic {
+                        full_ref_name,
+                        target,
+                        object,
+                        ..
+                    } if full_ref_name == "HEAD" => Some((object.to_string(), target.to_string())),
+                    _ => None,
+                })
+                .ok_or_else(|| {
+                    VendorError::Git(format!("cannot resolve default branch of {url}"))
+                })?;
+            let branch = branch
+                .strip_prefix("refs/heads/")
+                .unwrap_or(&branch)
+                .to_string();
+            Ok((sha, branch))
+        }
     }
-    let out = git(&tmp.path, &["ls-remote", "--symref", url, "HEAD"])?;
-    let branch = out
-        .lines()
-        .find_map(|l| l.strip_prefix("ref: refs/heads/"))
-        .and_then(|l| l.split_whitespace().next())
-        .ok_or_else(|| VendorError::Git(format!("cannot resolve default branch of {url}")))?
-        .to_string();
-    let sha = out
-        .lines()
-        .find(|l| l.ends_with("HEAD") && !l.starts_with("ref:"))
-        .and_then(|l| l.split_whitespace().next())
-        .ok_or_else(|| VendorError::Git(format!("cannot resolve HEAD of {url}")))?
-        .to_string();
-    Ok((sha, branch))
 }
 
 /// Copy a skill tree into the library.
@@ -284,5 +473,126 @@ mod tests {
             hash,
             "stamp excluded from hash"
         );
+    }
+
+    fn sig() -> gix::actor::Signature {
+        gix::actor::Signature {
+            name: "t".into(),
+            email: "t@e".into(),
+            time: gix::date::Time::new(1_600_000_000, 0),
+        }
+    }
+
+    /// One commit with a nested tree and an executable, all through gix.
+    fn commit(repo: &gix::Repository, files: &[(&str, &str, bool)], msg: &str) -> gix::ObjectId {
+        let mut top = Vec::new();
+        let mut sub = Vec::new();
+        for (path, text, exec) in files {
+            let oid = repo.write_blob(text.as_bytes()).unwrap().detach();
+            let kind = if *exec {
+                gix::objs::tree::EntryKind::BlobExecutable
+            } else {
+                gix::objs::tree::EntryKind::Blob
+            };
+            match path.split_once('/') {
+                Some((_dir, name)) => sub.push(gix::objs::tree::Entry {
+                    mode: kind.into(),
+                    filename: name.into(),
+                    oid,
+                }),
+                None => top.push(gix::objs::tree::Entry {
+                    mode: kind.into(),
+                    filename: (*path).into(),
+                    oid,
+                }),
+            }
+        }
+        if !sub.is_empty() {
+            let mut t = gix::objs::Tree { entries: sub };
+            t.entries.sort();
+            let oid = repo.write_object(&t).unwrap().detach();
+            top.push(gix::objs::tree::Entry {
+                mode: gix::objs::tree::EntryKind::Tree.into(),
+                filename: "skill".into(),
+                oid,
+            });
+        }
+        let mut tree = gix::objs::Tree { entries: top };
+        tree.entries.sort();
+        let tree = repo.write_object(&tree).unwrap().detach();
+        let parents: Vec<_> = repo
+            .head_id()
+            .ok()
+            .map(gix::Id::detach)
+            .into_iter()
+            .collect();
+        let s = sig();
+        repo.commit_as(
+            s.to_ref(&mut gix::date::parse::TimeBuf::default()),
+            s.to_ref(&mut gix::date::parse::TimeBuf::default()),
+            "HEAD",
+            msg,
+            tree,
+            parents,
+        )
+        .unwrap()
+        .detach()
+    }
+
+    #[test]
+    fn a_local_source_is_read_in_place_at_the_pinned_rev_and_resolved_at_head() {
+        let base = std::env::temp_dir().join(format!("almanac-vendor-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).unwrap();
+        let repo = gix::init(&base).unwrap();
+        let first = commit(
+            &repo,
+            &[
+                ("skill/SKILL.md", "---\nname: x\n---\none\n", false),
+                ("skill/run.sh", "#!/bin/sh\n", true),
+            ],
+            "one",
+        );
+        let second = commit(
+            &repo,
+            &[("skill/SKILL.md", "---\nname: x\n---\ntwo\n", false)],
+            "two",
+        );
+        let url = format!("file://{}", base.display());
+
+        let (tmp, how) = fetch_rev(&url, &first.to_string(), None).unwrap();
+        assert_eq!(how, "local-read");
+        assert_eq!(
+            std::fs::read_to_string(tmp.path.join("skill/SKILL.md")).unwrap(),
+            "---\nname: x\n---\none\n"
+        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            let mode = std::fs::metadata(tmp.path.join("skill/run.sh"))
+                .unwrap()
+                .permissions()
+                .mode();
+            assert_ne!(mode & 0o111, 0, "the executable bit is kept");
+        }
+        drop(tmp);
+
+        let (sha, branch) = resolve_remote(&url, None).unwrap();
+        assert_eq!(sha, second.to_string());
+        assert_eq!(branch, "main");
+        let (sha, r) = resolve_remote(&url, Some("main")).unwrap();
+        assert_eq!(
+            (sha.as_str(), r.as_str()),
+            (second.to_string().as_str(), "main")
+        );
+        assert!(resolve_remote(&url, Some("no-such-ref")).is_err());
+        let Err(e) = fetch_rev("git@example.com:o/r.git", "main", None) else {
+            panic!("ssh must be refused")
+        };
+        assert!(e.to_string().contains("https"), "{e}");
+        let Err(e) = fetch_rev(&url, "0000000000000000000000000000000000000000", None) else {
+            panic!("an unknown rev must fail")
+        };
+        assert!(e.to_string().contains("0000000"), "{e}");
     }
 }
