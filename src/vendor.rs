@@ -274,15 +274,28 @@ pub fn resolve_remote(url: &str, r#ref: Option<&str>) -> Result<(String, String)
             // Reopened isolated: init_bare opens with the user's gitconfig,
             // and a url.insteadOf there could turn https into ssh.
             let bare = open_local(&bare_dir.path)?;
-            let remote = bare.remote_at(remote).map_err(|e| gix_err("remote", e))?;
+            // A remote with no fetch refspec advertises only what its
+            // tag setting names, so HEAD and the heads would be missing.
+            // The heads refspec and no prefix filter make this a full
+            // `ls-remote --symref`.
+            let remote = bare
+                .remote_at(remote)
+                .map_err(|e| gix_err("remote", e))?
+                .with_refspecs(
+                    ["+refs/heads/*:refs/heads/*"],
+                    gix::remote::Direction::Fetch,
+                )
+                .map_err(|e| gix_err("refspec", e))?
+                .with_fetch_tags(gix::remote::fetch::Tags::All);
+            let options = gix::remote::ref_map::Options {
+                prefix_from_spec_as_filter_on_remote: false,
+                ..Default::default()
+            };
             let map = remote
                 .connect(gix::remote::Direction::Fetch)
                 .map_err(|e| gix_err("connect", e))?
                 .with_credentials(mdstore::git::credential_fn())
-                .ref_map(
-                    gix::progress::Discard,
-                    gix::remote::ref_map::Options::default(),
-                )
+                .ref_map(gix::progress::Discard, options)
                 .map_err(|e| gix_err("ls-remote", e))?;
             // The advertised refs, as `git ls-remote --symref` lists them.
             let (map, _handshake) = map;
@@ -293,9 +306,13 @@ pub fn resolve_remote(url: &str, r#ref: Option<&str>) -> Result<(String, String)
                         full_ref_name,
                         object,
                     } if full_ref_name == name => Some(object.to_string()),
+                    // An annotated tag pins the commit it peels to, as
+                    // the local path and `{r}^{commit}` do.
                     gix::protocol::handshake::Ref::Peeled {
-                        full_ref_name, tag, ..
-                    } if full_ref_name == name => Some(tag.to_string()),
+                        full_ref_name,
+                        object,
+                        ..
+                    } if full_ref_name == name => Some(object.to_string()),
                     gix::protocol::handshake::Ref::Symbolic {
                         full_ref_name,
                         object,
@@ -458,7 +475,7 @@ mod tests {
 
     #[test]
     fn vendor_stamps_and_hash_survives_round_trip() {
-        let base = std::env::temp_dir().join(format!("almanac-vendor-{}", std::process::id()));
+        let base = std::env::temp_dir().join(format!("almanac-vendor-copy-{}", std::process::id()));
         std::fs::remove_dir_all(&base).ok();
         let src = base.join("src");
         let lib = base.join("lib");
@@ -547,7 +564,7 @@ mod tests {
 
     #[test]
     fn a_local_source_is_read_in_place_at_the_pinned_rev_and_resolved_at_head() {
-        let base = std::env::temp_dir().join(format!("almanac-vendor-{}", std::process::id()));
+        let base = std::env::temp_dir().join(format!("almanac-vendor-gix-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base);
         std::fs::create_dir_all(&base).unwrap();
         let repo = gix::init(&base).unwrap();

@@ -500,8 +500,8 @@ fn show_diff(old: &Path, new: &Path) {
     collect_files(new, new, &mut paths);
     let mut diffs: Vec<(String, String, usize, usize)> = Vec::new();
     for rel in paths {
-        let a = std::fs::read(old.join(&rel)).unwrap_or_default();
-        let b = std::fs::read(new.join(&rel)).unwrap_or_default();
+        let a = read_for_diff(&old.join(&rel));
+        let b = read_for_diff(&new.join(&rel));
         if a == b {
             continue;
         }
@@ -541,16 +541,47 @@ fn show_diff(old: &Path, new: &Path) {
     }
 }
 
+/// The files under `root`, relative. Symlinks are listed as themselves
+/// and never followed: an upstream tree is untrusted until `hash_tree`
+/// has checked it, and a link out of the tree must not be read. Names
+/// on the deny list (the origin stamp, .git, editor droppings) are
+/// skipped, as vendoring skips them.
 fn collect_files(root: &Path, dir: &Path, out: &mut std::collections::BTreeSet<String>) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.is_dir() {
+        if path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(crate::hash::denied)
+        {
+            continue;
+        }
+        let Ok(meta) = std::fs::symlink_metadata(&path) else {
+            continue;
+        };
+        if meta.file_type().is_symlink() {
+            if let Ok(rel) = path.strip_prefix(root) {
+                out.insert(rel.to_string_lossy().into_owned());
+            }
+        } else if meta.is_dir() {
             collect_files(root, &path, out);
         } else if let Ok(rel) = path.strip_prefix(root) {
             out.insert(rel.to_string_lossy().into_owned());
         }
+    }
+}
+
+/// A file's bytes for the diff: a symlink diffs as its target text,
+/// never as what it points at.
+fn read_for_diff(path: &Path) -> Vec<u8> {
+    match std::fs::symlink_metadata(path) {
+        Ok(m) if m.file_type().is_symlink() => std::fs::read_link(path)
+            .map(|t| format!("-> {}\n", t.display()).into_bytes())
+            .unwrap_or_default(),
+        Ok(m) if m.is_file() => std::fs::read(path).unwrap_or_default(),
+        _ => Vec::new(),
     }
 }
