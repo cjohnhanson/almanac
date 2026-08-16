@@ -7,13 +7,12 @@ use crate::error::Error;
 use crate::skill;
 use crate::source::SkillSource;
 
+/// The one-line description. `--help` prints it and `prime` prints it, from
+/// this one place, so the two cannot drift.
+pub const ABOUT: &str = "Almanac curates agent skills and indexes them for agents to read";
+
 #[derive(Parser)]
-#[command(
-    name = "almanac",
-    version,
-    about = "Almanac curates agent skills and indexes them for agents to read",
-    max_term_width = 98
-)]
+#[command(name = "almanac", version, about = ABOUT, max_term_width = 98)]
 pub struct Args {
     /// Project root directory. Defaults to the current directory.
     #[arg(long, global = true, default_value = ".")]
@@ -101,12 +100,11 @@ pub enum Command {
         /// Skill source directories (repeatable).
         #[arg(long = "source", short = 's')]
         sources: Vec<String>,
-        /// Print a markdown skills index, as a gaff prime-section payload.
+        /// Print a markdown skills index for an agent's context.
         #[arg(long)]
         md: bool,
         /// Byte budget for --md. The output degrades to name-only
-        /// lines, then to a truncation note. Defaults to 4096, which
-        /// matches gaff's inject cap.
+        /// lines, then to a truncation note.
         #[arg(long, default_value_t = 4096)]
         max_bytes: usize,
     },
@@ -128,6 +126,8 @@ pub enum Command {
         #[arg(long)]
         bind: Option<String>,
     },
+    /// Print what almanac is and how to use it, for an agent's context.
+    Prime,
     /// Browse bundled documentation.
     Docs {
         /// Topic slug to print, or "search" to search.
@@ -135,6 +135,32 @@ pub enum Command {
         /// Search query. Used when the topic is "search".
         query: Option<String>,
     },
+}
+
+/// The prime: what almanac is, for an agent's context.
+///
+/// A pure function of the binary. It states the model and the commands
+/// an agent reaches for. It names no other tool, no host, and no
+/// location, and it directs nothing: when to run almanac is the caller's
+/// policy. Under 700 bytes, checked by a test.
+#[must_use]
+pub fn prime() -> String {
+    format!(
+        "# almanac\n\
+         {ABOUT}\n\
+         A skill is a directory with a SKILL.md: frontmatter with a name and a one-line \
+         description, then a body of instructions. A library is a directory with \
+         almanac.yml; --root <dir> names one, and the default is the current directory. \
+         Each entry is pinned to a commit and a hash. A library's stores.yml may declare \
+         other libraries; the nearer library wins a name collision.\n\
+         Commands:\n\
+         \x20 almanac list\n\
+         \x20 almanac show <name>\n\
+         \x20 almanac index [--md] [--max-bytes <n>]\n\
+         \x20 almanac status\n\
+         \x20 almanac store list\n\
+         More: almanac --help; almanac docs\n"
+    )
 }
 
 /// Run one CLI command. A host that mounts almanac as a subcommand
@@ -190,6 +216,10 @@ pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Re
             } else {
                 cmd_index(root, &all_sources);
             }
+            Ok(())
+        }
+        Command::Prime => {
+            print!("{}", prime());
             Ok(())
         }
         Command::Docs { topic, query } => cmd_docs(topic.as_deref(), query.as_deref()),
@@ -468,4 +498,68 @@ fn merge_sources(config_sources: &[SkillSource], cli_sources: &[String]) -> Vec<
         all.push(SkillSource::Path { path: s.clone() });
     }
     all
+}
+
+#[cfg(test)]
+mod prime_tests {
+    use super::*;
+    use clap::CommandFactory as _;
+
+    /// The prime is a pure function of the binary and its shape is a
+    /// contract that assemblers rely on. This test is the whole of that
+    /// contract, in code.
+    #[test]
+    fn prime_has_the_contract_shape() {
+        let p = prime();
+        let lines: Vec<&str> = p.lines().collect();
+        assert!(p.len() <= 700, "prime is {} bytes; the cap is 700", p.len());
+        assert_eq!(lines[0], "# almanac");
+        assert_eq!(lines[1], ABOUT, "line 2 is the --help about string");
+        assert!(p.ends_with('\n') && !p.ends_with("\n\n"), "one trailing newline");
+        assert!(!p.contains('\t'), "no tabs");
+        assert!(!p.contains("[gaff:"), "no spoofable prefix");
+        assert!(!p.chars().any(|c| c.is_control() && c != '\n'), "no control chars");
+        assert!(lines.iter().skip(1).all(|l| !l.starts_with('#')), "no headings below line 1");
+        assert!(lines.last().unwrap().starts_with("More: almanac --help; almanac docs"));
+        for word in ["gaff", "tisket", "zettel", "mdstore", "skills.sh", "Claude", "always", "never", "session start"] {
+            assert!(!p.contains(word), "prime must not say {word:?}");
+        }
+    }
+
+    /// Every `Commands:` line resolves against the real command table,
+    /// and every flag it names exists on that subcommand. This is the
+    /// drift the prime exists to prevent, caught where it lives.
+    #[test]
+    fn every_prime_command_exists() {
+        let p = prime();
+        let cmd = Args::command();
+        let start = p.find("Commands:\n").expect("a Commands: block") + "Commands:\n".len();
+        let end = p.find("More:").expect("a More: line");
+        for line in p[start..end].lines() {
+            let mut words = line.split_whitespace();
+            assert_eq!(words.next(), Some("almanac"), "{line:?} starts with the tool");
+            let mut node = &cmd;
+            let mut rest: Vec<&str> = Vec::new();
+            for w in words {
+                if let Some(sub) = node.get_subcommands().find(|s| s.get_name() == w) {
+                    node = sub;
+                } else {
+                    rest.push(w);
+                }
+            }
+            assert!(node.get_name() != "almanac", "{line:?} names no subcommand");
+            for w in rest {
+                let flag = w.trim_start_matches('[').trim_end_matches(']');
+                if let Some(long) = flag.strip_prefix("--") {
+                    let long = long.split(' ').next().unwrap();
+                    assert!(
+                        node.get_arguments().any(|a| a.get_long() == Some(long)),
+                        "{line:?}: `--{long}` is not a flag of `{}`",
+                        node.get_name()
+                    );
+                }
+            }
+        }
+        assert!(p[start..end].lines().count() <= 7, "at most seven commands");
+    }
 }
