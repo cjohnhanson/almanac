@@ -385,9 +385,9 @@ impl Workspace {
                 alias: m.alias_path.join("/"),
                 source: match &m.source {
                     mdstore::StoreSource::Path(p) => p.display().to_string(),
-                    mdstore::StoreSource::Git { url, rev } => {
-                        rev.as_ref().map_or_else(|| url.clone(), |r| format!("{url}@{r}"))
-                    }
+                    mdstore::StoreSource::Git { url, rev } => rev
+                        .as_ref()
+                        .map_or_else(|| url.clone(), |r| format!("{url}@{r}")),
                     mdstore::StoreSource::Blob { url } => url.clone(),
                 },
                 skills: self.snapshot.member_documents(i).count(),
@@ -602,7 +602,10 @@ fn collect_problems(base: &std::path::Path, dir: &std::path::Path, out: &mut Vec
         };
         if file_type.is_symlink() {
             let rel = path.strip_prefix(base).unwrap_or(&path);
-            out.push(format!("{} is a symlink and is not published", rel.display()));
+            out.push(format!(
+                "{} is a symlink and is not published",
+                rel.display()
+            ));
             continue;
         }
         if file_type.is_dir() {

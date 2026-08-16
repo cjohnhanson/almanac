@@ -152,8 +152,9 @@ fn show_reference(
             if !mdstore::store::is_regular_file(&resolved) {
                 return Ok(None);
             }
-            let content = mdstore::store::read_document(&resolved)
-                .map_err(|e| Error::General(format!("failed to read {}: {e}", resolved.display())))?;
+            let content = mdstore::store::read_document(&resolved).map_err(|e| {
+                Error::General(format!("failed to read {}: {e}", resolved.display()))
+            })?;
             return Ok(Some(content));
         }
     }
