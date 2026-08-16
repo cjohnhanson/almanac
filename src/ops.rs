@@ -154,6 +154,15 @@ pub fn add(dir: &Path, source: &str, opts: &AddOpts) -> Result<(), Error> {
     // manifest name must match it. Almanac refuses a mismatch here
     // instead of warning about it forever.
     let fm_name = skill_md_name(&skill_src)?;
+    // The name becomes a directory under the library, and a published
+    // skill supplies it. A name that is a path chose which directory
+    // almanac would delete and then write into.
+    if !mdstore::is_plain_stem(&fm_name) {
+        return Err(Error::General(format!(
+            "SKILL.md declares the name `{fm_name}`, which is not a plain name; \
+             a skill name may not hold a path separator"
+        )));
+    }
     let name = opts.name.clone().unwrap_or_else(|| fm_name.clone());
     if name != fm_name {
         return Err(Error::General(format!(

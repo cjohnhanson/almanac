@@ -171,6 +171,17 @@ pub fn copy_tree(src: &Path, dst: &Path) -> Result<(), VendorError> {
 /// Vendor a validated skill tree into `library/<name>`. Hashes the
 /// tree, copies it, then stamps it. Returns the content hash.
 pub fn vendor(skill_src: &Path, library: &Path, entry: &Entry) -> Result<String, VendorError> {
+    // This function removes a directory and writes in its place, and
+    // the name it uses came from a published SKILL.md or from an
+    // almanac.yml that a poisoned add already wrote. Check it here as
+    // well as at the point of entry: a guard on one route is a guard
+    // the other route does not have.
+    if !mdstore::is_plain_stem(&entry.name) {
+        return Err(VendorError::Io(format!(
+            "`{}` is not a plain skill name; a name may not hold a path separator",
+            entry.name
+        )));
+    }
     let hash = hash_tree(skill_src).map_err(VendorError::Hash)?;
     let dst = library.join(&entry.name);
     if dst.exists() {

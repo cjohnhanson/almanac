@@ -86,7 +86,21 @@ impl Manifest {
     pub fn load(dir: &Path) -> Result<Self, ManifestError> {
         let path = dir.join(MANIFEST_NAME);
         let bytes = std::fs::read_to_string(&path).map_err(|_| ManifestError::NotFound(path))?;
-        yaml_serde::from_str(&bytes).map_err(|e| ManifestError::Invalid(e.to_string()))
+        let manifest: Self =
+            yaml_serde::from_str(&bytes).map_err(|e| ManifestError::Invalid(e.to_string()))?;
+        // Every entry name becomes a directory under the library, and
+        // sync, update and remove all act on it. A manifest an earlier
+        // version wrote, or a person edited, must not drive those.
+        for entry in &manifest.skills {
+            if !mdstore::is_plain_stem(&entry.name) {
+                return Err(ManifestError::Invalid(format!(
+                    "entry `{}` is not a plain skill name; \
+                     a name may not hold a path separator",
+                    entry.name
+                )));
+            }
+        }
+        Ok(manifest)
     }
 
     pub fn save(&self, dir: &Path) -> Result<(), ManifestError> {
