@@ -26,3 +26,34 @@ assertions:
     command: "almanac show remote-tips | grep -q 'Version two'"
   - name: "each entry is pinned by content hash"
     command: "test $(grep -c 'sha256: sha256-v1:' almanac.yml) -eq 2"
+
+transitions:
+  # A source pinned by --ref to an annotated tag, whose tree carries a
+  # symlink and an executable. The tag pins the commit it peels to; the
+  # symlink is vendored as a symlink; the executable bit is kept. Dates
+  # are fixed so the recorded rev is the same on every run.
+  - name: "git source: --ref on an annotated tag, symlink and executable in the tree"
+    command: |
+      U=/tmp/almanac-missouri-tagged
+      rm -rf "$U" && mkdir -p "$U/tagged-skill/bin"
+      git -C "$U" init -q -b main
+      printf -- '---\nname: tagged-tips\ndescription: Tagged wisdom.\n---\n\nVersion one.\n' > "$U/tagged-skill/SKILL.md"
+      printf '#!/bin/sh\necho hi\n' > "$U/tagged-skill/bin/run.sh" && chmod 755 "$U/tagged-skill/bin/run.sh"
+      ln -s ../SKILL.md "$U/tagged-skill/bin/link-to-skill"
+      git -C "$U" add tagged-skill && GIT_AUTHOR_DATE="1600000200 +0000" GIT_COMMITTER_DATE="1600000200 +0000" git -C "$U" -c user.email=t@e -c user.name=t commit -qm one
+      GIT_COMMITTER_DATE="1600000201 +0000" git -C "$U" -c user.email=t@e -c user.name=t tag -a v1.0 -m 'release one'
+      C1=$(git -C "$U" rev-parse 'v1.0^{commit}')
+      printf -- '---\nname: tagged-tips\ndescription: Tagged wisdom.\n---\n\nVersion two.\n' > "$U/tagged-skill/SKILL.md"
+      git -C "$U" add tagged-skill && GIT_AUTHOR_DATE="1600000202 +0000" GIT_COMMITTER_DATE="1600000202 +0000" git -C "$U" -c user.email=t@e -c user.name=t commit -qm two
+      almanac add "git:file://$U" --path tagged-skill --ref v1.0 --accept >/dev/null || { echo "FAIL: add --ref tag"; exit 1; }
+      grep -q "rev: $C1" almanac.yml || { echo "FAIL: the tag pin is not the peeled commit"; grep rev: almanac.yml; exit 1; }
+      grep -q "Version one" skills/tagged-tips/SKILL.md || { echo "FAIL: wrong revision vendored"; exit 1; }
+      [ -x skills/tagged-tips/bin/run.sh ] || { echo "FAIL: executable bit lost"; exit 1; }
+      [ -L skills/tagged-tips/bin/link-to-skill ] || { echo "FAIL: symlink not a symlink"; exit 1; }
+      [ "$(readlink skills/tagged-tips/bin/link-to-skill)" = "../SKILL.md" ] || { echo "FAIL: symlink target"; exit 1; }
+      almanac sync --check >/dev/null || { echo "FAIL: check after tag add"; exit 1; }
+      almanac update tagged-tips | grep -q "up-to-date" || { echo "FAIL: a tag pin must not update to HEAD"; exit 1; }
+      rm -rf "$U"
+      echo TAG_OK
+    target: ../tag-pinned
+    stdout: "TAG_OK\n"
