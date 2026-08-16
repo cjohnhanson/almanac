@@ -39,6 +39,8 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std", "sig
 axum = "0.8"
 sha2 = "0.11.0"
 unicode-normalization = "0.1.25"
+# Unified diffs for `update`, in-process. Nothing here shells out to git.
+similar = "2"
 
 [dev-dependencies]
 tempfile = "3.26.0"
