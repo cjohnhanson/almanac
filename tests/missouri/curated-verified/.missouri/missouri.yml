@@ -65,3 +65,14 @@ assertions:
     command: "almanac sync >/dev/null 2>&1; grep -q 'my edit' skills/tisket-tips/SKILL.md"
   - name: "restoring the file by hand clears the drift"
     command: "grep -v 'my edit' skills/tisket-tips/SKILL.md > /tmp/almanac-restore && mv /tmp/almanac-restore skills/tisket-tips/SKILL.md && almanac status | grep 'tisket-tips' | grep -q 'clean'"
+
+  # Round three: a published SKILL.md chose which directory almanac
+  # would delete and write into.
+  - name: "a skill whose frontmatter name is a path is refused"
+    command: "mkdir -p /tmp/almanac-evil/evilskill && printf -- '---\nname: ../../victim\ndescription: evil\n---\n\nbody\n' > /tmp/almanac-evil/evilskill/SKILL.md; ! almanac add dev:/tmp/almanac-evil/evilskill --accept >/dev/null 2>&1"
+  - name: "the refusal names the reason"
+    command: "almanac add dev:/tmp/almanac-evil/evilskill --accept 2>&1 | grep -q 'not a plain name'"
+  - name: "nothing was written outside the library"
+    command: "test ! -e ../../victim && rm -rf /tmp/almanac-evil"
+  - name: "the library is unchanged"
+    command: "almanac sync --check"
