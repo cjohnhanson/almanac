@@ -82,10 +82,7 @@ impl AlmanacServer {
                 .map(|(fm, _)| fm.to_string())
                 .unwrap_or_default();
             let base = format!("{SCHEME}://{}", view.skill.name);
-            let mut resources = vec![(
-                format!("{base}/SKILL.md"),
-                digest_of(text.as_bytes()),
-            )];
+            let mut resources = vec![(format!("{base}/SKILL.md"), digest_of(text.as_bytes()))];
             for (rel, bytes) in ws.skill_files(view) {
                 resources.push((format!("{base}/{rel}"), digest_of(&bytes)));
             }
@@ -337,9 +334,7 @@ impl ServerHandler for AlmanacServer {
             Ok(text) => Ok(CallToolResult::success(vec![ContentBlock::text(text)]).into()),
             // A failure the caller can act on comes back as tool
             // content, not a protocol error, so the model can read it.
-            Err(e) => {
-                Ok(CallToolResult::error(vec![ContentBlock::text(e.to_string())]).into())
-            }
+            Err(e) => Ok(CallToolResult::error(vec![ContentBlock::text(e.to_string())]).into()),
         }
     }
 

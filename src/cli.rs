@@ -515,13 +515,37 @@ mod prime_tests {
         assert!(p.len() <= 700, "prime is {} bytes; the cap is 700", p.len());
         assert_eq!(lines[0], "# almanac");
         assert_eq!(lines[1], ABOUT, "line 2 is the --help about string");
-        assert!(p.ends_with('\n') && !p.ends_with("\n\n"), "one trailing newline");
+        assert!(
+            p.ends_with('\n') && !p.ends_with("\n\n"),
+            "one trailing newline"
+        );
         assert!(!p.contains('\t'), "no tabs");
         assert!(!p.contains("[gaff:"), "no spoofable prefix");
-        assert!(!p.chars().any(|c| c.is_control() && c != '\n'), "no control chars");
-        assert!(lines.iter().skip(1).all(|l| !l.starts_with('#')), "no headings below line 1");
-        assert!(lines.last().unwrap().starts_with("More: almanac --help; almanac docs"));
-        for word in ["gaff", "tisket", "zettel", "mdstore", "skills.sh", "Claude", "always", "never", "session start"] {
+        assert!(
+            !p.chars().any(|c| c.is_control() && c != '\n'),
+            "no control chars"
+        );
+        assert!(
+            lines.iter().skip(1).all(|l| !l.starts_with('#')),
+            "no headings below line 1"
+        );
+        assert!(
+            lines
+                .last()
+                .unwrap()
+                .starts_with("More: almanac --help; almanac docs")
+        );
+        for word in [
+            "gaff",
+            "tisket",
+            "zettel",
+            "mdstore",
+            "skills.sh",
+            "Claude",
+            "always",
+            "never",
+            "session start",
+        ] {
             assert!(!p.contains(word), "prime must not say {word:?}");
         }
     }
@@ -537,7 +561,11 @@ mod prime_tests {
         let end = p.find("More:").expect("a More: line");
         for line in p[start..end].lines() {
             let mut words = line.split_whitespace();
-            assert_eq!(words.next(), Some("almanac"), "{line:?} starts with the tool");
+            assert_eq!(
+                words.next(),
+                Some("almanac"),
+                "{line:?} starts with the tool"
+            );
             let mut node = &cmd;
             let mut rest: Vec<&str> = Vec::new();
             for w in words {

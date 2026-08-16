@@ -74,9 +74,10 @@ pub fn hash_tree(root: &Path) -> Result<String, HashError> {
         std::collections::HashMap::new();
     for (path, _, _) in &entries {
         if let Some(prior) = lower_seen.insert(path.to_lowercase(), path.clone())
-            && &prior != path {
-                return Err(HashError::CaseCollision(prior, path.clone()));
-            }
+            && &prior != path
+        {
+            return Err(HashError::CaseCollision(prior, path.clone()));
+        }
     }
 
     let mut hasher = Sha256::new();
@@ -104,14 +105,13 @@ pub fn hash_tree(root: &Path) -> Result<String, HashError> {
         }
     }
     let digest = hasher.finalize();
-    let hex = digest.iter().fold(
-        String::with_capacity(digest.len() * 2),
-        |mut acc, b| {
+    let hex = digest
+        .iter()
+        .fold(String::with_capacity(digest.len() * 2), |mut acc, b| {
             use std::fmt::Write as _;
             let _ = write!(acc, "{b:02x}");
             acc
-        },
-    );
+        });
     Ok(format!("{HASH_PREFIX}{hex}"))
 }
 
