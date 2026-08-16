@@ -215,7 +215,10 @@ pub fn fetch_rev(
             // The bare object store lives beside the checkout, in its own
             // temp dir, and goes with it.
             let bare_dir = tempdir::create("almanac-fetch-objects")?;
-            let bare = gix::init_bare(&bare_dir.path).map_err(|e| gix_err("init", e))?;
+            gix::init_bare(&bare_dir.path).map_err(|e| gix_err("init", e))?;
+            // Reopened isolated: init_bare opens with the user's gitconfig,
+            // and a url.insteadOf there could turn https into ssh.
+            let bare = open_local(&bare_dir.path)?;
             let want = format!("+{rev}:refs/almanac/want");
             let how = if fetch_into(&bare, &remote, &want, Some(1)).is_ok() {
                 "sha-fetch"
@@ -267,7 +270,10 @@ pub fn resolve_remote(url: &str, r#ref: Option<&str>) -> Result<(String, String)
         }
         Reach::Network(remote) => {
             let bare_dir = tempdir::create("almanac-resolve")?;
-            let bare = gix::init_bare(&bare_dir.path).map_err(|e| gix_err("init", e))?;
+            gix::init_bare(&bare_dir.path).map_err(|e| gix_err("init", e))?;
+            // Reopened isolated: init_bare opens with the user's gitconfig,
+            // and a url.insteadOf there could turn https into ssh.
+            let bare = open_local(&bare_dir.path)?;
             let remote = bare.remote_at(remote).map_err(|e| gix_err("remote", e))?;
             let map = remote
                 .connect(gix::remote::Direction::Fetch)
