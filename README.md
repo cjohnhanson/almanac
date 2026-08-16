@@ -45,9 +45,8 @@ skills:
 The index is small enough to inject into agent context. `list` prints
 one line per skill. `show` loads the instructions for one skill on
 demand. `index --md --max-bytes 4096` prints a markdown skills index
-that fits a byte budget. Wire it into
-[gaff](https://github.com/cjohnhanson/gaff) as a prime section and
-refresh it on a cadence.
+that fits a byte budget. `prime` prints what almanac is and how to
+use it, for an agent's context; it depends only on the binary version.
 
 ## Sources
 

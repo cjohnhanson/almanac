@@ -165,6 +165,13 @@ The JSON output is an array of skill objects. Each object holds `name`,
 Under the `--md` budget the output degrades in steps: full lines first,
 then names only, then a truncation note.
 
+### `almanac prime`
+
+Print what almanac is and how to use it, for an agent's context. The
+output depends only on the binary version: no arguments, config, or
+store changes it. Put it into an agent's context; policy about when to
+use almanac belongs to the caller.
+
 ### `almanac docs`
 
 Read the bundled almanac documentation.
