@@ -45,7 +45,8 @@ manifest and the content live in the same repo.
 ## Sources
 
 - `github:owner/repo` (or bare `owner/repo`) — pinned by commit and hash
-- `git:<url>` — any git URL, pinned the same way
+- `git:<url>` — any https, git://, or local git URL, pinned the same
+  way. ssh is refused; almanac spawns no ssh process.
 - `dev:<path>` — a local snapshot of a skill you develop alongside.
   `sync --check` skips it and reports drift as information.
 

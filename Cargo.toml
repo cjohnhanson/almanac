@@ -30,7 +30,7 @@ clap_mangen = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 yaml_serde = "0.10"
-mdstore = { git = "https://github.com/cjohnhanson/mdstore", rev = "f843ae4", features = ["mcp"] }
+mdstore = { git = "https://github.com/cjohnhanson/mdstore", rev = "989aa93", features = ["mcp"] }
 dirs = "6"
 thiserror = "2"
 sigpipe = "0.1.3"
@@ -41,6 +41,15 @@ sha2 = "0.11.0"
 unicode-normalization = "0.1.25"
 # Unified diffs for `update`, in-process. Nothing here shells out to git.
 similar = "2"
+# Fetch a pinned commit from a source in-process: https over gix's
+# reqwest transport, a local repository by reading its objects. No git
+# process runs.
+gix = { version = "0.86", default-features = false, features = [
+    "revision",
+    "sha1",
+    "blocking-network-client",
+    "blocking-http-transport-reqwest-rust-tls",
+] }
 
 [dev-dependencies]
 tempfile = "3.26.0"
