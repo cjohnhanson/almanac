@@ -59,11 +59,19 @@ permits.
     almanac sync --check    # verify; exit 1 when a pinned entry drifts
     almanac status          # pins, drift, and unmanaged neighbors
 
-## Context injection (gaff)
+## Context for an agent
 
-    almanac index --md --max-bytes 4096 > .gaff/sections/skills.md
+Two commands emit text meant for an agent's context. Neither decides
+when it is read; that is the caller's policy.
 
-This prints a skills index that fits gaff's injection cap. Wire it in
-as a gaff section, give it a refresh cadence, and run it again after
-each sync. The output degrades in steps under the budget: full lines
-first, then names only, then a truncation note.
+    almanac prime
+
+What almanac is, its model, and the commands an agent reaches for. A
+pure function of the binary, under 700 bytes: put it wherever your host
+primes a session, and it stays exact until almanac is upgraded.
+
+    almanac index --md --max-bytes 4096
+
+The skills index, as markdown, under a byte budget. The output degrades
+in steps under the budget: full lines first, then names only, then a
+truncation note. Regenerate it after each sync.
