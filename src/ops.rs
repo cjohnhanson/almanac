@@ -7,7 +7,6 @@
 //! change lands without a report.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use crate::error::Error;
 use crate::flags;
@@ -492,23 +491,66 @@ fn print_flags(name: &str, flags: &[flags::Flag]) {
     }
 }
 
-/// `git diff --no-index` exits 1 when the trees differ. That is the
-/// normal case here, not an error.
+/// Print a stat line per changed file, then a unified diff of the two
+/// trees. Binary files show as changed with no hunk. Files that differ
+/// only in a subdirectory still list by their path under the tree.
 fn show_diff(old: &Path, new: &Path) {
-    let out = Command::new("git")
-        .args(["diff", "--no-index", "--stat", "--"])
-        .arg(old)
-        .arg(new)
-        .output();
-    if let Ok(o) = out {
-        print!("{}", String::from_utf8_lossy(&o.stdout));
+    let mut paths: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    collect_files(old, old, &mut paths);
+    collect_files(new, new, &mut paths);
+    let mut diffs: Vec<(String, String, usize, usize)> = Vec::new();
+    for rel in paths {
+        let a = std::fs::read(old.join(&rel)).unwrap_or_default();
+        let b = std::fs::read(new.join(&rel)).unwrap_or_default();
+        if a == b {
+            continue;
+        }
+        let (Ok(a), Ok(b)) = (std::str::from_utf8(&a), std::str::from_utf8(&b)) else {
+            diffs.push((rel, String::new(), 0, 0));
+            continue;
+        };
+        let diff = similar::TextDiff::from_lines(a, b);
+        let mut added = 0;
+        let mut removed = 0;
+        for change in diff.iter_all_changes() {
+            match change.tag() {
+                similar::ChangeTag::Insert => added += 1,
+                similar::ChangeTag::Delete => removed += 1,
+                similar::ChangeTag::Equal => {}
+            }
+        }
+        let text = diff
+            .unified_diff()
+            .context_radius(3)
+            .header(&format!("a/{rel}"), &format!("b/{rel}"))
+            .to_string();
+        diffs.push((rel, text, added, removed));
     }
-    let out = Command::new("git")
-        .args(["diff", "--no-index", "--"])
-        .arg(old)
-        .arg(new)
-        .output();
-    if let Ok(o) = out {
-        print!("{}", String::from_utf8_lossy(&o.stdout));
+    for (rel, _, added, removed) in &diffs {
+        println!(" {rel} | +{added} -{removed}");
+    }
+    if !diffs.is_empty() {
+        println!(" {} file(s) changed", diffs.len());
+    }
+    for (rel, text, _, _) in &diffs {
+        if text.is_empty() {
+            println!("Binary files a/{rel} and b/{rel} differ");
+        } else {
+            print!("{text}");
+        }
+    }
+}
+
+fn collect_files(root: &Path, dir: &Path, out: &mut std::collections::BTreeSet<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_files(root, &path, out);
+        } else if let Ok(rel) = path.strip_prefix(root) {
+            out.insert(rel.to_string_lossy().into_owned());
+        }
     }
 }

@@ -17,6 +17,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "sigpipe",
+ "similar",
  "tempfile",
  "thiserror",
  "tokio",
@@ -1167,6 +1168,12 @@ checksum = "5584bfb3e0d348139d8210285e39f6d2f8a1902ac06de343e06357d1d763d8e6"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "similar"
+version = "2.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbbb5d9659141646ae647b42fe094daf6c6192d1620870b449d9557f748b2daa"
 
 [[package]]
 name = "slab"
