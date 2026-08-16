@@ -1,0 +1,5 @@
+managed-by: almanac
+name: tagged-tips
+source: git:file:///tmp/almanac-missouri-tagged
+rev: a579e9b77f7872d83f30369a33770786c5d70f3d
+sha256: sha256-v1:92dd6621961bbc6a6dd7a4b6704f2aa18638b690e517a07bf5cdb6da9fc59bec

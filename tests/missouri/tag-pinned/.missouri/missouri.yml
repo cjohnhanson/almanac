@@ -1,0 +1,10 @@
+doc: |
+  A library holding a git entry pinned by --ref to an annotated tag,
+  with a symlink and an executable vendored as such.
+assertions:
+  - name: "status lists the tagged entry as clean"
+    command: "almanac status | grep -q 'tagged-tips.*clean'"
+  - name: "the vendored symlink is a symlink"
+    command: "test -L skills/tagged-tips/bin/link-to-skill"
+  - name: "the vendored executable is executable"
+    command: "test -x skills/tagged-tips/bin/run.sh"
