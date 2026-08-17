@@ -1,0 +1,36 @@
+fresh-eyes: independent cold reviewer (subagent, no authorship of this branch), full scope of the three commits moving the reference and SKILL.md reads onto the mdstore capability.
+
+Verdict LAND on this tip, 05d5b60.
+
+Two rounds. Round one returned DO-NOT-LAND on four items, and found a
+real hole rather than a test gap: a handle confines the names used
+under a root and does not choose the root, so a library shipping
+'references -> /etc' chose it and almanac show served /etc/hosts. The
+predicate this branch replaced had the same hole, so it was inherited.
+Three names in the escape loop asserted nothing, and one comment
+claimed the old predicate followed an outward link when it refused it.
+
+Round two blocked again on the listing: the read path was fixed and
+append_file_references seven lines below still followed the link,
+enumerating 61 filenames out of /etc into an agent's context. Names
+only, since content was already refused, but the two halves disagreed
+about what existed, so an agent was told to run commands show rejects.
+
+Round three verified by execution. The enumeration returns 0 names. The
+reviewer built a references directory holding one of every entry type
+and diffed the listing against what show serves for each: no
+disagreement in either direction. Every guard has a named test that
+dies when the guard dies. parse_skill_md takes one parameter, so the
+reproduction where an entry reported a path whose bytes it never read
+no longer compiles.
+
+76 tests, clippy clean, fmt clean, missouri 7 passed 0 failed, 121
+assertions.
+
+Open, none blocking, each filed: a check-then-open race two syscalls
+wide, measured at 0 wins in 40000 attempts and 45 in 2000 with the
+window widened; a hard link out of the references directory, which has
+no target to inspect; a comment that claims the listing and show apply
+the same test when a third path is what makes them agree; and a named
+pipe in a skill directory hanging almanac and the MCP server forever,
+which predates this work.
