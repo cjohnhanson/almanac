@@ -1,0 +1,1 @@
+fresh-eyes: subagent review of the user-config feature, 2 rounds ending ready-to-merge; all six findings fixed and verified by exercise. Rebased onto the confined-library migration; suite green at 8 paths, 133 assertions on the landed pin.
