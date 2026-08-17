@@ -74,12 +74,6 @@ fn walk_at(root: &Path, dir: &Path, flags: &mut Vec<Flag>, depth: usize) {
             walk_at(root, &p, flags, depth + 1);
             continue;
         }
-        // Only a regular file is inspected. Reading a pipe blocks
-        // until a writer arrives, and the scanner walks a library the
-        // reader does not control.
-        if !file_type.is_file() {
-            continue;
-        }
         let rp = rel(root, &p);
         inspect_file(&p, &rp, root, flags);
     }
@@ -118,6 +112,16 @@ fn inspect_file(p: &Path, rp: &str, root: &Path, flags: &mut Vec<Flag>) {
         push("payload outside SKILL.md + references/ convention");
     }
 
+    // The path-only checks above run for every entry. Only a regular
+    // file is opened: reading a pipe blocks until a writer arrives, and
+    // the scanner walks a library the reader does not control. Guarding
+    // at the walk instead dropped the executable-bit and convention
+    // checks for the skipped entry, so a pipe named payload.sh at a
+    // skill root scanned as clean.
+    if !std::fs::symlink_metadata(p).is_ok_and(|m| m.is_file()) {
+        push("not a regular file");
+        return;
+    }
     let Ok(bytes) = std::fs::read(p) else {
         push("unreadable file");
         return;
