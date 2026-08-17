@@ -139,12 +139,22 @@ fn show_reference(
 
             // A library may be content somebody else controls, and the
             // reference name arrives from caller text. The handle
-            // confines it to the references directory, so a name that
-            // climbs out is refused by the operating system.
+            // confines the name to the references directory, so a name
+            // that climbs out is refused by the operating system.
             //
-            // This was a canonicalize and a starts_with. Between the
-            // check and the open, the path could change; the handle
-            // has no such gap, because there is no second lookup.
+            // The handle does not confine the directory it opens on.
+            // StoreDir::open resolves its root with ambient authority,
+            // so a library that ships references as a symlink chooses
+            // the root, and every name under it reads wherever the
+            // link points. A library shipping 'references -> /etc'
+            // served /etc/hosts through this function.
+            //
+            // The link is refused here by type, before the handle
+            // exists. Nothing below can undo that, because a name
+            // never reaches a root that was never opened.
+            if !is_real_directory(&refs_dir) {
+                return Ok(None);
+            }
             let Ok(refs) = mdstore::confined::StoreDir::open(&refs_dir) else {
                 return Ok(None);
             };
@@ -263,10 +273,25 @@ fn scan_directory(dir: &Path) -> Result<Vec<SkillEntry>, Error> {
     Ok(entries)
 }
 
+/// True when the path is a directory and not a link to one.
+///
+/// A capability confines the names used under a root. It does not
+/// choose the root: `StoreDir::open` resolves that with the authority
+/// this process already holds. Where the root comes from content the
+/// reader does not control, the root is checked by type first.
+fn is_real_directory(path: &Path) -> bool {
+    std::fs::symlink_metadata(path).is_ok_and(|m| m.is_dir())
+}
+
 fn parse_skill_md(skill_md: &Path, skill_dir: &Path) -> Result<SkillEntry, Error> {
     // A skill directory can hold a symlinked SKILL.md pointing at a
-    // file outside the library. The guard refuses anything that is not
-    // a regular file.
+    // file outside the library. The handle refuses it by type.
+    //
+    // The directory this opens on is not checked here. scan_directory
+    // is the only caller and refuses a linked directory before it
+    // calls, so a check here is one no input can reach. The
+    // references directory has no such caller and is checked at the
+    // point it is opened.
     let name = skill_md
         .file_name()
         .and_then(|n| n.to_str())
@@ -642,8 +667,12 @@ mod tests {
         let sources = make_skill_with_refs(dir.path());
         std::fs::write(dir.path().join("secret.md"), "SECRET").unwrap();
 
+        // Each of these must be refused by a guard rather than by
+        // missing. '../../secret.md' from the references directory
+        // lands beside the skill, where nothing sits, so it asserted
+        // nothing; the planted file is one level further up.
         for name in [
-            "../../secret.md",
+            "../../../secret.md",
             "../SKILL.md",
             "/etc/hosts",
             "..",
@@ -655,9 +684,10 @@ mod tests {
         }
 
         // A link planted inside the references directory is refused by
-        // type, not followed. A predicate that canonicalized first
-        // accepted this, because the resolved path was checked and the
-        // open happened afterwards.
+        // type. The predicate this replaced also refused this one:
+        // canonicalizing a link that points out gives a path that
+        // fails the starts_with. The case that separates the two is
+        // the link pointing back inside, below.
         let refs = dir.path().join("skills/my-skill/references");
         std::os::unix::fs::symlink(dir.path().join("secret.md"), refs.join("planted.md")).unwrap();
         let out = show_reference("my-skill", "planted.md", dir.path(), &sources).unwrap();
@@ -679,6 +709,86 @@ mod tests {
         // What genuinely sits there still reads.
         let good = show_reference("my-skill", "examples.md", dir.path(), &sources).unwrap();
         assert!(good.is_some_and(|c| c.contains("Some examples")));
+    }
+
+    /// A handle confines the names used under a root. It does not
+    /// choose the root. A library that ships references as a link
+    /// chose it, and every name under it read wherever the link
+    /// pointed: a library shipping 'references -> /etc' served
+    /// /etc/hosts through show.
+    #[test]
+    fn a_linked_references_directory_is_never_opened() {
+        let dir = tempfile::tempdir().unwrap();
+        let sources = make_skill_with_refs(dir.path());
+        std::fs::create_dir_all(dir.path().join("elsewhere")).unwrap();
+        std::fs::write(dir.path().join("elsewhere/hosts.md"), "OUTSIDE").unwrap();
+
+        // Replace the real references directory with a link out.
+        let refs = dir.path().join("skills/my-skill/references");
+        std::fs::remove_dir_all(&refs).unwrap();
+        std::os::unix::fs::symlink(dir.path().join("elsewhere"), &refs).unwrap();
+
+        let out = show_reference("my-skill", "hosts.md", dir.path(), &sources).unwrap();
+        assert!(
+            out.is_none(),
+            "a linked references directory was read through"
+        );
+    }
+
+    /// A skill directory is chosen by the library too. The walk
+    /// refuses a linked one by type before it reads anything, which is
+    /// what this pins; a second check inside `parse_skill_md` would be
+    /// unreachable.
+    #[test]
+    fn a_linked_skill_directory_is_not_indexed() {
+        let dir = tempfile::tempdir().unwrap();
+        let sources = make_skill_with_refs(dir.path());
+        std::fs::create_dir_all(dir.path().join("outside/sneaky")).unwrap();
+        std::fs::write(
+            dir.path().join("outside/sneaky/SKILL.md"),
+            "---\nname: sneaky\ndescription: from outside\n---\n\nbody\n",
+        )
+        .unwrap();
+        std::os::unix::fs::symlink(
+            dir.path().join("outside/sneaky"),
+            dir.path().join("skills/sneaky"),
+        )
+        .unwrap();
+
+        let names: Vec<String> = index(dir.path(), &sources)
+            .into_iter()
+            .map(|e| e.name)
+            .collect();
+        assert!(
+            !names.iter().any(|n| n == "sneaky"),
+            "a linked skill directory was indexed"
+        );
+    }
+
+    /// A SKILL.md that is a link points at a file the library does not
+    /// hold. Reverting the handle here broke no test.
+    #[test]
+    fn a_linked_skill_md_is_not_indexed() {
+        let dir = tempfile::tempdir().unwrap();
+        let sources = make_skill_with_refs(dir.path());
+        std::fs::write(
+            dir.path().join("outside-skill.md"),
+            "---\nname: sneaky\ndescription: from outside\n---\n\nbody\n",
+        )
+        .unwrap();
+        let sneaky = dir.path().join("skills/sneaky");
+        std::fs::create_dir_all(&sneaky).unwrap();
+        std::os::unix::fs::symlink(dir.path().join("outside-skill.md"), sneaky.join("SKILL.md"))
+            .unwrap();
+
+        let names: Vec<String> = index(dir.path(), &sources)
+            .into_iter()
+            .map(|e| e.name)
+            .collect();
+        assert!(
+            !names.iter().any(|n| n == "sneaky"),
+            "a linked SKILL.md was indexed"
+        );
     }
 
     #[test]
