@@ -37,8 +37,9 @@ No environment variable participates. The config path is fixed, and the
 home directory comes from the passwd database, not `$HOME`: both are
 repo-settable channels.
 
-Every write prints its resolved target on stderr unless `--root` was
-passed. A read resolved by walking or by fallback prints its source.
+A write prints its resolved target on stderr unless the target is the
+working directory's own library or `--root` named it. A read resolved by
+walking or by fallback prints its source.
 
 ## Library commands
 
