@@ -9,30 +9,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
-name = "almanac"
-version = "0.2.0"
-dependencies = [
- "axum",
- "clap",
- "clap_complete",
- "clap_mangen",
- "dirs",
- "gix",
- "mdstore-core",
- "rmcp",
- "serde",
- "serde_json",
- "sha2",
- "sigpipe",
- "similar",
- "tempfile",
- "thiserror",
- "tokio",
- "unicode-normalization",
- "yaml_serde",
-]
-
-[[package]]
 name = "ambient-authority"
 version = "0.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2194,6 +2170,30 @@ name = "litemap"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47d9d19d1d6efa0109d2f65ff4c85cddd50bd572e5a00127ab10987290bcefae"
+
+[[package]]
+name = "lmnc"
+version = "0.2.0"
+dependencies = [
+ "axum",
+ "clap",
+ "clap_complete",
+ "clap_mangen",
+ "dirs",
+ "gix",
+ "mdstore-core",
+ "rmcp",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sigpipe",
+ "similar",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "unicode-normalization",
+ "yaml_serde",
+]
 
 [[package]]
 name = "lock_api"
