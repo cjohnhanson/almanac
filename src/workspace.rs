@@ -557,6 +557,17 @@ fn collect_files(base: &std::path::Path, dir: &std::path::Path, out: &mut Vec<(S
         if rel == "SKILL.md" || rel.starts_with('.') {
             continue;
         }
+        // A regular file, or nothing. A library is content somebody
+        // else may control, and opening a named pipe to read it blocks
+        // until a writer arrives. None is coming, so the walk never
+        // returns, and this walk backs the served library: an agent's
+        // tool call hangs forever.
+        //
+        // The dirent type answers without opening anything, so the
+        // pipe is never touched.
+        if !file_type.is_file() {
+            continue;
+        }
         if let Ok(bytes) = std::fs::read(&path) {
             out.push((rel, bytes));
         }
@@ -591,6 +602,14 @@ fn collect_problems(base: &std::path::Path, dir: &std::path::Path, out: &mut Vec
         if rel == "SKILL.md" || rel.starts_with('.') {
             continue;
         }
+        // Named by type rather than opened. This is the diagnostic
+        // command, so it must survive what it reports: reading a named
+        // pipe here blocked forever, and check is exactly where a
+        // person looks when a library behaves strangely.
+        if !file_type.is_file() {
+            out.push(format!("{rel} is not a regular file and is not published"));
+            continue;
+        }
         if std::fs::read(&path).is_err() {
             out.push(format!("{rel} is not readable and is not published"));
         }
@@ -602,5 +621,64 @@ fn label(store: &str) -> String {
         "(this library)".to_string()
     } else {
         store.to_string()
+    }
+}
+
+#[cfg(test)]
+mod walker_tests {
+    use super::*;
+
+    /// A named pipe must not stop the walk.
+    ///
+    /// Opening a pipe to read blocks until a writer arrives, and none
+    /// is coming. Both walkers skipped a link by type and then read
+    /// whatever was left, so a pipe in a skill directory hung the CLI
+    /// and the served library: an agent's tool call never returned.
+    ///
+    /// The walk runs on its own thread, because a regression here
+    /// would otherwise hang the suite rather than fail it.
+    #[test]
+    fn a_named_pipe_does_not_stop_either_walk() {
+        let base = std::env::temp_dir().join(format!("almanac-pipe-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(base.join("references")).unwrap();
+        std::fs::write(base.join("references/real.md"), "ref").unwrap();
+        let made = std::process::Command::new("mkfifo")
+            .arg(base.join("references/pipe.md"))
+            .status()
+            .is_ok_and(|s| s.success());
+        assert!(made, "mkfifo is unavailable, so this test asserts nothing");
+
+        let dir = base.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let mut files = Vec::new();
+            collect_files(&dir, &dir, &mut files);
+            let mut problems = Vec::new();
+            collect_problems(&dir, &dir, &mut problems);
+            let _ = tx.send((files, problems));
+        });
+
+        let Ok((files, problems)) = rx.recv_timeout(std::time::Duration::from_secs(5)) else {
+            panic!("a walk blocked on a named pipe");
+        };
+
+        let names: Vec<&str> = files.iter().map(|(n, _)| n.as_str()).collect();
+        assert!(
+            names.contains(&"references/real.md"),
+            "the real file was dropped"
+        );
+        assert!(
+            !names.iter().any(|n| n.contains("pipe")),
+            "a pipe was published"
+        );
+        assert!(
+            problems
+                .iter()
+                .any(|p| p.contains("pipe.md") && p.contains("not a regular file")),
+            "check did not name the pipe: {problems:?}"
+        );
+
+        let _ = std::fs::remove_dir_all(&base);
     }
 }
