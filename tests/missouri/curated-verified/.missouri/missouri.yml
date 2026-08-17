@@ -63,16 +63,19 @@ assertions:
     command: "almanac sync --check 2>&1 | grep -q 'skip.*tisket-tips'"
   - name: "sync does not discard the edit"
     command: "almanac sync >/dev/null 2>&1; grep -q 'my edit' skills/tisket-tips/SKILL.md"
+  # Scratch files stay inside the work dir. Two parallel paths run
+  # this same transition; a shared /tmp name made their mv and rm -rf
+  # race, and the race failed a run on 2026-08-17.
   - name: "restoring the file by hand clears the drift"
-    command: "grep -v 'my edit' skills/tisket-tips/SKILL.md > /tmp/almanac-restore && mv /tmp/almanac-restore skills/tisket-tips/SKILL.md && almanac status | grep 'tisket-tips' | grep -q 'clean'"
+    command: "grep -v 'my edit' skills/tisket-tips/SKILL.md > skills/tisket-tips/SKILL.md.restore && mv skills/tisket-tips/SKILL.md.restore skills/tisket-tips/SKILL.md && almanac status | grep 'tisket-tips' | grep -q 'clean'"
 
   # Round three: a published SKILL.md chose which directory almanac
   # would delete and write into.
   - name: "a skill whose frontmatter name is a path is refused"
-    command: "mkdir -p /tmp/almanac-evil/evilskill && printf -- '---\nname: ../../victim\ndescription: evil\n---\n\nbody\n' > /tmp/almanac-evil/evilskill/SKILL.md; ! almanac add dev:/tmp/almanac-evil/evilskill --accept >/dev/null 2>&1"
+    command: "mkdir -p almanac-evil/evilskill && printf -- '---\nname: ../../victim\ndescription: evil\n---\n\nbody\n' > almanac-evil/evilskill/SKILL.md; ! almanac add \"dev:$PWD/almanac-evil/evilskill\" --accept >/dev/null 2>&1"
   - name: "the refusal names the reason"
-    command: "almanac add dev:/tmp/almanac-evil/evilskill --accept 2>&1 | grep -q 'not a plain name'"
+    command: "almanac add \"dev:$PWD/almanac-evil/evilskill\" --accept 2>&1 | grep -q 'not a plain name'"
   - name: "nothing was written outside the library"
-    command: "test ! -e ../../victim && rm -rf /tmp/almanac-evil"
+    command: "test ! -e ../../victim && rm -rf almanac-evil"
   - name: "the library is unchanged"
     command: "almanac sync --check"
