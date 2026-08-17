@@ -74,6 +74,12 @@ fn walk_at(root: &Path, dir: &Path, flags: &mut Vec<Flag>, depth: usize) {
             walk_at(root, &p, flags, depth + 1);
             continue;
         }
+        // Only a regular file is inspected. Reading a pipe blocks
+        // until a writer arrives, and the scanner walks a library the
+        // reader does not control.
+        if !file_type.is_file() {
+            continue;
+        }
         let rp = rel(root, &p);
         inspect_file(&p, &rp, root, flags);
     }

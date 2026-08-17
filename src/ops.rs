@@ -469,7 +469,17 @@ fn source_url(source: &str) -> Result<String, Error> {
 }
 
 fn skill_md_name(skill_src: &Path) -> Result<String, Error> {
-    let md = std::fs::read_to_string(skill_src.join("SKILL.md"))
+    // A dev source is a directory somebody names on the command line.
+    // Its SKILL.md must be a regular file: opening a pipe to read it
+    // blocks until a writer arrives, and none is coming.
+    let path = skill_src.join("SKILL.md");
+    if !std::fs::symlink_metadata(&path).is_ok_and(|m| m.is_file()) {
+        return Err(Error::General(format!(
+            "no regular SKILL.md in {}",
+            skill_src.display()
+        )));
+    }
+    let md = std::fs::read_to_string(&path)
         .map_err(|_| Error::General(format!("no SKILL.md in {}", skill_src.display())))?;
     md.lines()
         .skip(1)

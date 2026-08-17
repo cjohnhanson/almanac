@@ -663,6 +663,23 @@ mod walker_tests {
             panic!("a walk blocked on a named pipe");
         };
 
+        // Every other reader that walks the same directory. The first
+        // fix closed two doors of six, and the four below hung on this
+        // exact fixture one command later: status and sync through the
+        // hash, the red-flag scan, the vendor copy, and a dev source's
+        // own SKILL.md.
+        let (tx2, rx2) = std::sync::mpsc::channel();
+        let dir2 = base.clone();
+        std::thread::spawn(move || {
+            let hashed = crate::hash::hash_tree(&dir2).is_err();
+            let flagged = crate::flags::scan(&dir2).len();
+            let _ = tx2.send((hashed, flagged));
+        });
+        let Ok((hash_refused, _flags)) = rx2.recv_timeout(std::time::Duration::from_secs(5)) else {
+            panic!("the hash or the red-flag scan blocked on a named pipe");
+        };
+        assert!(hash_refused, "the hash accepted a pipe as content");
+
         let names: Vec<&str> = files.iter().map(|(n, _)| n.as_str()).collect();
         assert!(
             names.contains(&"references/real.md"),
