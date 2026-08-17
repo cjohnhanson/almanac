@@ -175,15 +175,27 @@ fn show_reference(
 /// references/ directory.
 fn append_file_references(skill_name: &str, skill_dir: &Path, content: &mut String) {
     let refs_dir = skill_dir.join("references");
-    if !refs_dir.is_dir() {
+    // The same guard the read path uses. A listing that follows a link
+    // enumerates names out of wherever it points, and a listing is
+    // what reaches an agent's context. A library shipping
+    // 'references -> /etc' put 61 filenames there.
+    //
+    // The listing must also agree with show. Advertising a file that
+    // show refuses tells an agent to run a command that fails.
+    if !is_real_directory(&refs_dir) {
         return;
     }
+    let Ok(refs) = mdstore::confined::StoreDir::open(&refs_dir) else {
+        return;
+    };
     let mut files: Vec<String> = std::fs::read_dir(&refs_dir)
         .into_iter()
         .flatten()
         .flatten()
-        .filter(|e| e.path().is_file())
         .filter_map(|e| e.file_name().to_str().map(String::from))
+        // By the same test show applies, so the two never disagree
+        // about what exists. A link among the entries is skipped.
+        .filter(|name| refs.is_document(name))
         .collect();
     if files.is_empty() {
         return;
@@ -265,7 +277,7 @@ fn scan_directory(dir: &Path) -> Result<Vec<SkillEntry>, Error> {
         if !skill_md.exists() {
             continue;
         }
-        if let Ok(entry) = parse_skill_md(&skill_md, &path) {
+        if let Ok(entry) = parse_skill_md(&path) {
             entries.push(entry);
         }
     }
@@ -275,6 +287,10 @@ fn scan_directory(dir: &Path) -> Result<Vec<SkillEntry>, Error> {
 
 /// True when the path is a directory and not a link to one.
 ///
+/// A hard link is not covered, and cannot be: it has no target to
+/// inspect, and the metadata says regular file. git does not carry
+/// one; tar does, and so does a hand-copied library.
+///
 /// A capability confines the names used under a root. It does not
 /// choose the root: `StoreDir::open` resolves that with the authority
 /// this process already holds. Where the root comes from content the
@@ -283,7 +299,9 @@ fn is_real_directory(path: &Path) -> bool {
     std::fs::symlink_metadata(path).is_ok_and(|m| m.is_dir())
 }
 
-fn parse_skill_md(skill_md: &Path, skill_dir: &Path) -> Result<SkillEntry, Error> {
+fn parse_skill_md(skill_dir: &Path) -> Result<SkillEntry, Error> {
+    let skill_md = skill_dir.join("SKILL.md");
+    let skill_md = skill_md.as_path();
     // A skill directory can hold a symlinked SKILL.md pointing at a
     // file outside the library. The handle refuses it by type.
     //
@@ -292,12 +310,13 @@ fn parse_skill_md(skill_md: &Path, skill_dir: &Path) -> Result<SkillEntry, Error
     // calls, so a check here is one no input can reach. The
     // references directory has no such caller and is checked at the
     // point it is opened.
-    let name = skill_md
-        .file_name()
-        .and_then(|n| n.to_str())
-        .ok_or_else(|| Error::General(format!("{} has no file name", skill_md.display())))?;
+    //
+    // One parameter, not two. Taking a file path and a directory let
+    // the two disagree: nothing enforced that the file sat in the
+    // directory, so an entry could report a path whose bytes it never
+    // read, and the error arm could name a file that was never opened.
     let content = mdstore::confined::StoreDir::open(skill_dir)
-        .and_then(|dir| dir.read(name))
+        .and_then(|dir| dir.read("SKILL.md"))
         .map_err(|e| Error::General(format!("failed to read {}: {e}", skill_md.display())))?;
 
     // mdstore parses the frontmatter, so almanac, zettel, and tisket
@@ -362,7 +381,7 @@ mod tests {
         std::fs::create_dir_all(&skill_dir).unwrap();
         let path = skill_dir.join("SKILL.md");
         std::fs::write(&path, content).unwrap();
-        parse_skill_md(&path, &skill_dir)
+        parse_skill_md(&skill_dir)
     }
 
     #[test]
@@ -423,7 +442,7 @@ mod tests {
         )
         .unwrap();
 
-        let entry = parse_skill_md(&skill_dir.join("SKILL.md"), &skill_dir).unwrap();
+        let entry = parse_skill_md(&skill_dir).unwrap();
         assert_eq!(entry.name, "my-skill");
         assert_eq!(entry.description, "Does a useful thing");
     }
@@ -439,7 +458,7 @@ mod tests {
         )
         .unwrap();
 
-        let entry = parse_skill_md(&skill_dir.join("SKILL.md"), &skill_dir).unwrap();
+        let entry = parse_skill_md(&skill_dir).unwrap();
         assert_eq!(entry.name, "fallback-name");
     }
 
@@ -788,6 +807,58 @@ mod tests {
         assert!(
             !names.iter().any(|n| n == "sneaky"),
             "a linked SKILL.md was indexed"
+        );
+    }
+
+    /// The listing reaches an agent's context, so a link there
+    /// enumerates names out of wherever it points. A library shipping
+    /// 'references -> /etc' put 61 filenames into that context, in the
+    /// function seven lines below the read guard.
+    #[test]
+    fn the_references_listing_does_not_enumerate_through_a_link() {
+        let dir = tempfile::tempdir().unwrap();
+        let sources = make_skill_with_refs(dir.path());
+        std::fs::create_dir_all(dir.path().join("elsewhere")).unwrap();
+        std::fs::write(dir.path().join("elsewhere/id_rsa.md"), "KEY").unwrap();
+
+        let refs = dir.path().join("skills/my-skill/references");
+        std::fs::remove_dir_all(&refs).unwrap();
+        std::os::unix::fs::symlink(dir.path().join("elsewhere"), &refs).unwrap();
+
+        let out = show_to_string("my-skill", dir.path(), &sources);
+        assert!(
+            !out.contains("id_rsa"),
+            "the listing enumerated a name through a link:\n{out}"
+        );
+        assert!(
+            !out.contains("## References"),
+            "a linked directory was listed"
+        );
+    }
+
+    /// The listing and the reader must agree. Advertising a file that
+    /// show refuses tells an agent to run a command that fails.
+    #[test]
+    fn the_references_listing_matches_what_show_will_serve() {
+        let dir = tempfile::tempdir().unwrap();
+        let sources = make_skill_with_refs(dir.path());
+        std::fs::write(dir.path().join("secret.md"), "SECRET").unwrap();
+        let refs = dir.path().join("skills/my-skill/references");
+        std::os::unix::fs::symlink(dir.path().join("secret.md"), refs.join("planted.md")).unwrap();
+
+        let out = show_to_string("my-skill", dir.path(), &sources);
+        assert!(
+            !out.contains("planted.md"),
+            "the listing advertised a link that show refuses:\n{out}"
+        );
+        assert!(
+            out.contains("examples.md"),
+            "a real reference stopped being listed"
+        );
+        assert!(
+            show_reference("my-skill", "planted.md", dir.path(), &sources)
+                .unwrap()
+                .is_none()
         );
     }
 
