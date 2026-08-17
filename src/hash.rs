@@ -38,6 +38,7 @@ pub enum HashError {
     CaseCollision(String, String),
     EscapingSymlink(String),
     Unreadable(String),
+    Irregular(String),
 }
 
 impl std::fmt::Display for HashError {
@@ -49,6 +50,10 @@ impl std::fmt::Display for HashError {
             ),
             Self::EscapingSymlink(p) => write!(f, "symlink `{p}` points outside the skill root"),
             Self::Unreadable(p) => write!(f, "cannot read `{p}`"),
+            Self::Irregular(p) => write!(
+                f,
+                "`{p}` is not a regular file and cannot be part of a skill"
+            ),
         }
     }
 }
@@ -162,6 +167,12 @@ fn collect(
             out.push((rel, Kind::Symlink(target.to_string_lossy().into_owned()), p));
         } else if meta.is_dir() {
             collect(root, &p, out)?;
+        } else if !meta.is_file() {
+            // A pipe, a socket or a device node is not content this
+            // hashes. Reading a pipe blocks until a writer arrives and
+            // none is coming, so status and sync never returned on a
+            // library that check already reports.
+            return Err(HashError::Irregular(rel));
         } else {
             #[cfg(unix)]
             let exec = {

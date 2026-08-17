@@ -373,8 +373,15 @@ pub fn copy_tree(src: &Path, dst: &Path) -> Result<(), VendorError> {
             std::os::unix::fs::symlink(&target, &to).map_err(|e| VendorError::Io(e.to_string()))?;
         } else if meta.is_dir() {
             copy_tree(&from, &to)?;
-        } else {
+        } else if meta.is_file() {
             std::fs::copy(&from, &to).map_err(|e| VendorError::Io(e.to_string()))?;
+        } else {
+            // A pipe is not content to vendor, and copying one blocks
+            // until a writer arrives.
+            return Err(VendorError::Io(format!(
+                "{} is not a regular file and is not vendored",
+                from.display()
+            )));
         }
     }
     Ok(())
