@@ -1,0 +1,45 @@
+fresh-eyes: independent cold reviewer (subagent, no authorship of this branch), full scope of the three commits closing every reader that hung on a named pipe.
+
+Verdict LAND on this tip, 715ed1d.
+
+Three rounds. Round one returned DO-NOT-LAND: the first fix closed two
+doors of six, and status, sync --check, add and update all hung on the
+same pipe one command after check named it. Round two returned
+DO-NOT-LAND: the branch was six commits behind main so the evidence
+did not carry, status called a pipe drift where sync said unreadable,
+and the scanner guard at the walk dropped the executable-bit and
+convention checks so a pipe named payload.sh scanned clean.
+
+Round three verified on the rebased tree, through the real binary. A
+served library with a pipe: list, check, show, index all return. A
+vendored library with a pipe: status says unreadable, sync --check
+skips, check names it. A dev source with a pipe: add refuses through
+the hash. A dev source whose SKILL.md is a pipe: add refuses by type.
+MCP almanac_get_skill on the served fixture returns bytes.
+
+Mutations, each killed by a named test: collect_files guard deleted,
+red at the timeout after 5.02s; collect_problems guard deleted, same;
+the pipe report removed from collect_problems, red at 'check did not
+name the pipe'; hash guard deleted, red at the timeout; scanner guard
+deleted, red at the timeout; scanner report removed, red at 'the
+scanner did not name the pipe'; copy_tree guard deleted, red at the
+timeout; status arm reverted to drifted, missouri 8 passed 1 failed on
+the named transition. The reviewer also confirmed the transition
+catches a real hang: with a walker guard deleted the suite fails in
+12 seconds rather than wedging.
+
+The copy_tree assertion had passed with the guard removed in an
+earlier round because the destination sat inside the tree being
+copied. Found by writing the test to fail first; the destination is
+outside now.
+
+77 tests, clippy clean, fmt clean, missouri 9 passed 0 failed, 18
+steps, 178 assertions.
+
+Follow-ups, none blocking: skill_md_name's guard has no unit test and
+is exercised only through add; the dirent type is a readdir snapshot
+so a library mutating under the walk still defeats every guard,
+closing which needs open(O_NONBLOCK|O_NOFOLLOW) then fstat at each
+site; a silent continue on an unreadable dirent type; a missing
+cfg(unix) gate on the walker test; manifest.rs reads almanac.yml
+ambiently.
