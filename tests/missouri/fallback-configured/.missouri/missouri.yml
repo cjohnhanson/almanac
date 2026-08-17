@@ -1,0 +1,26 @@
+doc: |
+  The user-level fallback. A cwd with no library reads the configured
+  root library and says so; a write refuses and names --home. Every
+  command passes --user-config so the real ~/.config/mdstore/config.yml
+  never participates.
+assertions:
+  - name: "a read from a libraryless cwd falls back and announces it"
+    command: "cd work/src && almanac --user-config ../../cfg.yml list 2>err.txt >out.txt && grep -q 'reading root library' err.txt && grep -q 'root-skill' out.txt && rm err.txt out.txt"
+  - name: "show reads the fallback library too"
+    command: "cd work/src && almanac --user-config ../../cfg.yml show root-skill 2>/dev/null | grep -q 'Root Skill'"
+  - name: "a write from a libraryless cwd refuses and names --home"
+    command: "cd work/src && ! almanac --user-config ../../cfg.yml sync >/dev/null 2>&1 && almanac --user-config ../../cfg.yml sync 2>&1 | grep -q -- '--home'"
+  - name: "with no config the read fails naming both facts"
+    command: "cd work/src && ! almanac --user-config ../../absent.yml list >/dev/null 2>&1 && almanac --user-config ../../absent.yml list 2>&1 | grep -q 'store root <path>'"
+  - name: "an explicit --root never falls back"
+    command: "! almanac --user-config cfg.yml --root work list >/dev/null 2>&1"
+  - name: "a subdirectory of a library resolves it by walking"
+    command: "cd rootlib && mkdir -p sub && cd sub && almanac --user-config ../../cfg.yml list 2>err.txt | grep -q 'root-skill' && grep -q 'using library at' err.txt && rm err.txt && cd .. && rmdir sub"
+  - name: "--home writes act on the root library"
+    command: "cd work/src && almanac --user-config ../../cfg.yml --home sync 2>err.txt >/dev/null && grep -q 'writing to root library' err.txt && rm err.txt"
+  - name: "a config whose root has no library is an error, not unconfigured"
+    command: |
+      printf 'format: 1\nroot_store: %s/work\n' "$PWD" > bad.yml &&
+      ! almanac --user-config bad.yml list >/dev/null 2>&1 &&
+      almanac --user-config bad.yml list 2>&1 | grep -q 'has no almanac.yml' &&
+      rm bad.yml

@@ -11,7 +11,14 @@ env:
 setup:
   - name: "build almanac"
     command: "cargo build --quiet --manifest-path ../../Cargo.toml"
-  - name: "link binary"
-    command: "mkdir -p .missouri/bin && ln -sf $(cd ../.. && pwd)/target/debug/almanac .missouri/bin/almanac"
+  # A wrapper, not a symlink: it pins --user-config to a path that
+  # never exists, so the machine's real ~/.config/mdstore/config.yml
+  # cannot leak a root-library fallback into the suite. The flag's last
+  # occurrence wins, so a test that needs a config passes its own.
+  - name: "wrap binary"
+    command: |
+      mkdir -p .missouri/bin &&
+      printf '#!/bin/sh\nexec %s/target/debug/almanac --user-config /nonexistent-missouri-user-config.yml "$@"\n' "$(cd ../.. && pwd)" > .missouri/bin/almanac &&
+      chmod +x .missouri/bin/almanac
 packages:
   - jq

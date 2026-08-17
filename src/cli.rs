@@ -14,12 +14,69 @@ pub const ABOUT: &str = "Almanac curates agent skills and indexes them for agent
 #[derive(Parser)]
 #[command(name = "almanac", version, about = ABOUT, max_term_width = 98)]
 pub struct Args {
-    /// Project root directory. Defaults to the current directory.
-    #[arg(long, global = true, default_value = ".")]
-    pub root: String,
+    /// Library directory. Literal: the directory must hold almanac.yml;
+    /// no walk, no fallback. Without it, the nearest almanac.yml at or
+    /// above the cwd is used; with none, reads use the configured root
+    /// library and a write needs --home.
+    #[arg(long, global = true)]
+    pub root: Option<std::path::PathBuf>,
+
+    /// Act on the configured root library (`almanac store root`),
+    /// wherever the command runs.
+    #[arg(long, global = true, conflicts_with = "root")]
+    pub home: bool,
+
+    /// Read the user config from this file instead of its fixed path.
+    /// A test seam; a flag is visible where an env var is not. The last
+    /// occurrence wins, so a wrapper can pin a default that a specific
+    /// call still overrides.
+    #[arg(long, global = true, hide = true, overrides_with = "user_config")]
+    pub user_config: Option<std::path::PathBuf>,
 
     #[command(subcommand)]
     pub command: Command,
+}
+
+/// Whether a command needs a store at all, and whether it writes.
+/// Exhaustive on the leaf action, so a new subcommand does not compile
+/// until it is classified.
+const fn intent(command: &Command) -> Option<mdstore::resolve::Intent> {
+    use mdstore::resolve::Intent::{Read, Write};
+    Some(match command {
+        // Rootless: these never resolve a store. Init acts on its
+        // literal root, as it always has.
+        Command::GenMan { .. }
+        | Command::GenCompletions { .. }
+        | Command::Prime
+        | Command::Docs { .. }
+        | Command::Init { .. }
+        | Command::Store(StoreCommand::Root(_)) => return None,
+        // With explicit --source directories, listing needs no library
+        // at all: the sources are the answer. Only a sourceless call
+        // resolves a library.
+        Command::List { sources }
+        | Command::Show { sources, .. }
+        | Command::Index { sources, .. }
+            if !sources.is_empty() =>
+        {
+            return None;
+        }
+        Command::List { .. }
+        | Command::Show { .. }
+        | Command::Index { .. }
+        | Command::Status
+        | Command::Check
+        | Command::Store(StoreCommand::List) => Read,
+        // Curation writes the library; sync writes the cache and the
+        // vendored trees; a served library is a standing surface that
+        // must never rest on a fallback its clients cannot see.
+        Command::Add { .. }
+        | Command::Sync { .. }
+        | Command::Update { .. }
+        | Command::Remove { .. }
+        | Command::Serve { .. }
+        | Command::Store(StoreCommand::Sync) => Write,
+    })
 }
 
 #[derive(Parser)]
@@ -150,9 +207,9 @@ pub fn prime() -> String {
          {ABOUT}\n\
          A skill is a directory with a SKILL.md: frontmatter with a name and a one-line \
          description, then a body of instructions. A library is a directory with \
-         almanac.yml; --root <dir> names one, and the default is the current directory. \
-         Each entry is pinned to a commit and a hash. A library's stores.yml may declare \
-         other libraries; the nearer library wins a name collision.\n\
+         almanac.yml, found upward from the cwd or named by --root; with none, reads use \
+         the root library, writes need --home. Each entry is pinned to a commit and a \
+         hash. stores.yml may declare other libraries; the nearer wins a name collision.\n\
          Commands:\n\
          \x20 almanac list\n\
          \x20 almanac show <name>\n\
@@ -242,7 +299,7 @@ pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Re
                 accept,
             },
         ),
-        Command::Store(cmd) => cmd_store(root, cmd),
+        Command::Store(cmd) => cmd_store(root, &cmd),
         Command::Check => cmd_check(root),
         Command::Serve { surfaces, bind } => cmd_serve(root, &surfaces, bind.as_deref()),
         Command::Sync { check } => crate::ops::sync(root, check),
@@ -253,7 +310,7 @@ pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Re
 }
 
 /// The `store` subcommands.
-fn cmd_store(root: &Path, cmd: StoreCommand) -> Result<(), Error> {
+fn cmd_store(root: &Path, cmd: &StoreCommand) -> Result<(), Error> {
     match cmd {
         StoreCommand::List => {
             let ws = crate::workspace::Workspace::open(root)?;
@@ -274,6 +331,9 @@ fn cmd_store(root: &Path, cmd: StoreCommand) -> Result<(), Error> {
                 println!("{label}  {}  {state}{age}", m.source);
             }
             Ok(())
+        }
+        StoreCommand::Root(_) => {
+            unreachable!("store root is rootless and handled in run()")
         }
         StoreCommand::Sync => {
             let ws = crate::workspace::Workspace::open_fetching(root)?;
@@ -332,21 +392,165 @@ fn cmd_serve(root: &Path, surfaces: &str, bind: Option<&str>) -> Result<(), Erro
 }
 
 /// The library subcommands.
-#[derive(clap::Subcommand, Clone, Copy)]
+#[derive(clap::Subcommand, Clone)]
 pub enum StoreCommand {
     /// List the libraries this library reads, in precedence order.
     List,
     /// Fetch the declared remote libraries into the local cache.
     Sync,
+    /// Show or set the root library that reads fall back to.
+    Root(StoreRootArgs),
+}
+
+#[derive(clap::Args, Clone)]
+pub struct StoreRootArgs {
+    /// The directory of the root library. Without it, print the
+    /// current setting.
+    pub path: Option<std::path::PathBuf>,
+    /// Replace an already-set root with a different one.
+    #[arg(long)]
+    pub force: bool,
 }
 
 /// Run the standalone binary.
 pub fn run(args: Args) -> Result<(), Error> {
-    let root = Path::new(&args.root);
-    // The curated library is a source. Without this, `almanac init`
-    // and `almanac add` build a library that `almanac list` cannot
-    // see, and the tool's main purpose fails on its own output.
-    run_command(root, &manifest_sources(root), args.command)
+    // Rootless commands never resolve a store, so `almanac prime` and
+    // `almanac store root` work from any cwd with no config at all.
+    let Some(intent) = intent(&args.command) else {
+        if let Command::Store(StoreCommand::Root(a)) = args.command {
+            return run_store_root(&a, args.user_config.as_deref());
+        }
+        // A rootless command acts on the literal --root when one is
+        // given (as `almanac --root dir init` always has), else the cwd.
+        let cwd = std::env::current_dir().map_err(|e| Error::General(e.to_string()))?;
+        let root = match &args.root {
+            Some(r) if r.is_relative() => cwd.join(r),
+            Some(r) => r.clone(),
+            None => cwd,
+        };
+        return run_command(&root, &manifest_sources(&root), args.command);
+    };
+    let cwd = std::env::current_dir().map_err(|e| Error::General(e.to_string()))?;
+    let config = load_user_config(args.user_config.as_deref())?;
+    let resolved = mdstore::resolve::resolve_root(
+        &cwd,
+        args.root.as_deref(),
+        args.home,
+        intent,
+        &config,
+        VOCAB,
+    )
+    .map_err(|e| Error::General(e.to_string()))?;
+    announce(&resolved.root, &cwd, resolved.via, intent);
+    // The curated library is a source, computed from the RESOLVED root:
+    // computed from the literal argument, a walked or fallback run
+    // would list nothing, silently.
+    let root = resolved.root;
+    run_command(&root, &manifest_sources(&root), args.command)
+}
+
+const VOCAB: mdstore::resolve::Vocabulary<'static> = mdstore::resolve::Vocabulary {
+    marker: "almanac.yml",
+    noun: "library",
+    tool: "almanac",
+};
+
+fn load_user_config(path: Option<&Path>) -> Result<mdstore::userconfig::UserConfig, Error> {
+    path.map_or_else(
+        mdstore::userconfig::UserConfig::load,
+        mdstore::userconfig::UserConfig::load_from,
+    )
+    .map_err(|e| Error::General(e.to_string()))
+}
+
+/// One stderr line whenever the answer to "where did that act" is not
+/// visible in the command line itself. A read found by walking or by
+/// fallback names its source; every write names its target.
+fn announce(root: &Path, cwd: &Path, via: mdstore::resolve::Via, intent: mdstore::resolve::Intent) {
+    use mdstore::resolve::{Intent, Via};
+    match (intent, via) {
+        (_, Via::Flag) => {}
+        (Intent::Write, Via::Home) => {
+            eprintln!("almanac: writing to root library {}", root.display());
+        }
+        // A write into the cwd's own library is what the command line
+        // already says; only a target elsewhere needs naming.
+        (Intent::Write, _) if root != cwd => {
+            eprintln!("almanac: writing to library {}", root.display());
+        }
+        (Intent::Read, Via::Walk) if root != cwd => {
+            eprintln!(
+                "almanac: using library at {} (almanac.yml above {})",
+                root.display(),
+                cwd.display()
+            );
+        }
+        (Intent::Read, Via::Config) => {
+            eprintln!(
+                "almanac: no almanac.yml at or above {}; reading root library {}",
+                cwd.display(),
+                root.display()
+            );
+        }
+        (Intent::Read | Intent::Write, _) => {}
+    }
+}
+
+/// `almanac store root [<path>] [--force]`: show or set the root
+/// library in ~/.config/mdstore/config.yml. Rootless, and acts on its
+/// literal argument; resolution here would be circular.
+fn run_store_root(args: &StoreRootArgs, user_config: Option<&Path>) -> Result<(), Error> {
+    let config = load_user_config(user_config)?;
+    let Some(path) = &args.path else {
+        match config.root_store {
+            Some(r) => println!("root_store: {} (~/.config/mdstore/config.yml)", r.display()),
+            None => println!("root_store: unset"),
+        }
+        return Ok(());
+    };
+    let cwd = std::env::current_dir().map_err(|e| Error::General(e.to_string()))?;
+    let abs = if path.is_relative() {
+        cwd.join(path)
+    } else {
+        path.clone()
+    };
+    if !abs.join("almanac.yml").is_file() {
+        return Err(Error::General(format!(
+            "no almanac.yml in {}; run `almanac init` there first",
+            abs.display()
+        )));
+    }
+    if let Some(old) = &config.root_store
+        && *old != abs
+        && !args.force
+    {
+        return Err(Error::General(format!(
+            "root_store is {}; pass --force to change it to {}",
+            old.display(),
+            abs.display()
+        )));
+    }
+    for sibling in ["tisket.yml", "zettel.yml"] {
+        if !abs.join(sibling).is_file() {
+            eprintln!(
+                "almanac: note: {} has no {sibling}; the other tools will not treat it as their root",
+                abs.display()
+            );
+        }
+    }
+    let old = config.root_store.clone();
+    let written = mdstore::userconfig::UserConfig::save_root(&abs)
+        .map_err(|e| Error::General(e.to_string()))?;
+    match old {
+        Some(o) => println!(
+            "root_store: {} -> {} ({})",
+            o.display(),
+            abs.display(),
+            written.display()
+        ),
+        None => println!("root_store: {} ({})", abs.display(), written.display()),
+    }
+    Ok(())
 }
 
 /// The library directory that `almanac.yml` governs, as a source.
