@@ -1,5 +1,9 @@
 [package]
-name = "almanac"
+# The registry name. `almanac` there belongs to an unrelated project,
+# and a registry name is first-come and permanent. `[[bin]] name`
+# below keeps the typed command as `almanac`; only the install line
+# carries the qualified name.
+name = "lmnc"
 version = "0.2.0"
 edition = "2024"
 description = "Almanac curates agent skills and indexes them for agents to read"
@@ -27,6 +31,18 @@ exclude = [
     ".editorconfig",
     "rust-toolchain.toml",
 ]
+
+# The import path stays `almanac`, so no source changes when the
+# registry name does.
+[lib]
+name = "almanac"
+
+# The command a user types stays `almanac`. A package name and a binary
+# name are independent, so only the install line carries the
+# qualified one.
+[[bin]]
+name = "almanac"
+path = "src/main.rs"
 
 [lints.rust]
 unsafe_code = "forbid"
