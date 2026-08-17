@@ -14,12 +14,31 @@ Almanac curates agent skills and indexes them for agents to read.
 
 ## Global Options
 
-`--root <path>` — Project root directory. Defaults to `.`, the current
-directory. Applies to every subcommand.
+`--root <dir>` — Library directory, literal: the directory must hold
+`almanac.yml`; no walk, no fallback.
+
+`--home` — Act on the configured root library, wherever the command
+runs.
 
 `--version` — Print the version and exit.
 
 `--help` — Print the help and exit.
+
+## Root resolution
+
+Without `--root`, a command finds its library by one rule, identical in
+tisket and zettel: the nearest `almanac.yml` at or above the working
+directory wins. The walk requires a regular file and stops at the first
+directory the invoking user does not own, so a marker planted in a
+shared ancestor captures nothing. With no library found, a read falls
+back to the root library set in `~/.config/mdstore/config.yml` and says
+so on stderr; a write never falls back — it fails and names `--home`.
+No environment variable participates. The config path is fixed, and the
+home directory comes from the passwd database, not `$HOME`: both are
+repo-settable channels.
+
+Every write prints its resolved target on stderr unless `--root` was
+passed. A read resolved by walking or by fallback prints its source.
 
 ## Library commands
 
@@ -190,6 +209,14 @@ List the libraries that this library reads, in precedence order. The
 first row is this library. Each other row shows a declared library, its
 source, and its skill count. A remote library also shows the age of its
 cache.
+
+## `almanac store root`
+
+Show or set the root library that reads fall back to. `almanac store
+root` prints the current setting; `almanac store root <path>` writes it
+to `~/.config/mdstore/config.yml` (the path must hold `almanac.yml`;
+changing an existing setting needs `--force`). The file is shared with
+tisket and zettel, so one private repo serves all three tools.
 
 ## `almanac store sync`
 

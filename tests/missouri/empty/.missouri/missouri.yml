@@ -21,3 +21,22 @@ transitions:
       printf 'library: local\nskills: []\n' > almanac.yml
       printf 'format: 2\nstores:\n  - alias: shared\n    path: ./shared\n' > stores.yml
     target: "../composed"
+
+  # The user-level fallback scenario: a root library beside a
+  # libraryless work directory, bound by a config file the commands
+  # name with --user-config so the real user config never participates.
+  - name: "configure a root library"
+    command: |
+      mkdir -p rootlib/skills/root-skill work/src &&
+      printf -- '---\nname: root-skill\ndescription: Lives in the root library.\n---\n\n# Root Skill\n' > rootlib/skills/root-skill/SKILL.md &&
+      printf 'library: skills\nskills: []\n' > rootlib/almanac.yml &&
+      printf 'format: 1\nroot_store: %s/rootlib\n' "$PWD" > cfg.yml
+    target: "../fallback-configured"
+    comparators:
+      files:
+        - path: "rootlib/"
+          ignore: true
+        - path: "work/"
+          ignore: true
+        - path: "cfg.yml"
+          ignore: true

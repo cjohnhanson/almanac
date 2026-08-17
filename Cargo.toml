@@ -53,3 +53,9 @@ gix = { version = "0.86", default-features = false, features = [
 
 [dev-dependencies]
 tempfile = "3.26.0"
+
+# DEVELOPMENT ONLY — removed before push: the user-config work spans
+# mdstore and this tool; the patch reads the sibling worktree until the
+# mdstore commit is pushed and the rev pin bumped.
+[patch."https://github.com/cjohnhanson/mdstore"]
+mdstore = { path = "/Users/codyhanson/Projects/.wt/mdstore-eikj" }
