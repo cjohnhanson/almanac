@@ -18,7 +18,8 @@ setup:
   - name: "wrap binary"
     command: |
       mkdir -p .missouri/bin &&
-      printf '#!/bin/sh\nexec %s/target/debug/almanac --user-config /nonexistent-missouri-user-config.yml "$@"\n' "$(cd ../.. && pwd)" > .missouri/bin/almanac &&
-      chmod +x .missouri/bin/almanac
+      cp ../../target/debug/almanac .missouri/bin/almanac-bin &&
+      printf '#!/bin/sh\nexec "$(dirname "$0")/almanac-bin" --user-config /nonexistent-missouri-user-config.yml "$@"\n' > .missouri/bin/almanac &&
+      chmod +x .missouri/bin/almanac .missouri/bin/almanac-bin
 packages:
   - jq
