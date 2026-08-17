@@ -160,38 +160,12 @@ fn library_dir_of(content: &StoreContent) -> String {
 }
 
 /// The subdirectories of a library directory.
+///
+/// One implementation answers for a local directory and for a git
+/// tree. This held a third copy of it, and a copy is a copy that can
+/// miss the link test.
 fn subdirectories(content: &StoreContent, dir_name: &str) -> Vec<String> {
-    if let Some(root) = content.dir() {
-        let Ok(entries) = std::fs::read_dir(root.join(dir_name)) else {
-            return Vec::new();
-        };
-        let mut names: Vec<String> = entries
-            .flatten()
-            // file_type() on the dirent does not follow a link, so a
-            // symlinked skill directory is skipped rather than walked
-            // into somebody else's filesystem.
-            .filter(|e| e.file_type().is_ok_and(|t| t.is_dir() && !t.is_symlink()))
-            .filter_map(|e| e.file_name().to_str().map(std::string::ToString::to_string))
-            .filter(|n| !n.starts_with('.'))
-            .collect();
-        names.sort();
-        return names;
-    }
-    let mut names: Vec<String> = Vec::new();
-    if let StoreContent::GitTree { cache, rev, .. } = content
-        && let Ok(paths) = mdstore::git::list_tree(cache, rev, dir_name)
-    {
-        for path in paths {
-            if let Some((skill, _)) = path.split_once('/')
-                && !skill.starts_with('.')
-                && !names.contains(&skill.to_string())
-            {
-                names.push(skill.to_string());
-            }
-        }
-    }
-    names.sort();
-    names
+    content.subdirectories(dir_name)
 }
 
 /// A skill as seen from this library.
@@ -497,7 +471,7 @@ impl Workspace {
         let Some(parent) = std::path::Path::new(&view.skill.rel_path).parent() else {
             return Vec::new();
         };
-        let skill_dir = root.join(parent);
+        let skill_dir = root.root().join(parent);
         let mut problems = Vec::new();
         collect_problems(&skill_dir, &skill_dir, &mut problems);
         problems.sort();
@@ -522,7 +496,7 @@ impl Workspace {
         let mut out = Vec::new();
         match content {
             StoreContent::Dir(root) => {
-                let skill_dir = root.join(parent);
+                let skill_dir = root.root().join(parent);
                 collect_files(&skill_dir, &skill_dir, &mut out);
             }
             StoreContent::GitTree { cache, rev, .. } => {
