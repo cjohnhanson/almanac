@@ -58,3 +58,27 @@ transitions:
       echo INDEX_OK
     target: ../curated-indexed
     stdout: "INDEX_OK\n"
+  - name: "a named pipe in a vendored skill stops nothing and reads as unreadable"
+    command: |
+      # Every command has a wall-clock bound. A hang must fail the
+      # suite, not wedge it: opening a pipe to read blocks forever, and
+      # that is the failure this transition exists to catch.
+      run() { perl -e 'alarm shift; exec @ARGV' 8 "$@"; }
+      mkfifo skills/tisket-tips/pipe.md || { echo "FAIL: mkfifo"; exit 1; }
+      OUT=$(run almanac check 2>&1); c=$?
+      [ "$c" -ne 142 ] || { echo "FAIL: check hung"; exit 1; }
+      printf '%s' "$OUT" | grep -q "pipe.md is not a regular file" || { echo "FAIL: check did not name the pipe: $OUT"; exit 1; }
+      OUT=$(run almanac status 2>&1); c=$?
+      [ "$c" -ne 142 ] || { echo "FAIL: status hung"; exit 1; }
+      printf '%s' "$OUT" | grep -q "tisket-tips.*unreadable" || { echo "FAIL: status did not say unreadable: $OUT"; exit 1; }
+      printf '%s' "$OUT" | grep -q "tisket-tips.*drifted" && { echo "FAIL: status called a pipe drift: $OUT"; exit 1; }
+      OUT=$(run almanac sync --check 2>&1); c=$?
+      [ "$c" -ne 142 ] || { echo "FAIL: sync --check hung"; exit 1; }
+      run almanac list >/dev/null 2>&1; c=$?
+      [ "$c" -ne 142 ] || { echo "FAIL: list hung"; exit 1; }
+      run almanac show tisket-tips >/dev/null 2>&1; c=$?
+      [ "$c" -ne 142 ] || { echo "FAIL: show hung"; exit 1; }
+      rm skills/tisket-tips/pipe.md
+      echo PIPE_OK
+    target: ../curated-verified
+    stdout: "PIPE_OK\n"

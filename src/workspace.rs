@@ -670,15 +670,34 @@ mod walker_tests {
         // own SKILL.md.
         let (tx2, rx2) = std::sync::mpsc::channel();
         let dir2 = base.clone();
+        // The destination must sit OUTSIDE the tree being copied. A
+        // destination inside it made copy_tree recurse into its own
+        // output and fail on that, before it reached the pipe, so the
+        // copy assertion passed with the guard removed.
+        let dst = std::env::temp_dir().join(format!("almanac-pipe-copy-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dst);
         std::thread::spawn(move || {
             let hashed = crate::hash::hash_tree(&dir2).is_err();
-            let flagged = crate::flags::scan(&dir2).len();
-            let _ = tx2.send((hashed, flagged));
+            let flags = crate::flags::scan(&dir2);
+            let copied = crate::vendor::copy_tree(&dir2, &dst).is_err();
+            let _ = tx2.send((hashed, flags, copied));
         });
-        let Ok((hash_refused, _flags)) = rx2.recv_timeout(std::time::Duration::from_secs(5)) else {
-            panic!("the hash or the red-flag scan blocked on a named pipe");
+        let Ok((hash_refused, flags, copy_refused)) =
+            rx2.recv_timeout(std::time::Duration::from_secs(5))
+        else {
+            panic!("the hash, the red-flag scan or the vendor copy blocked on a named pipe");
         };
         assert!(hash_refused, "the hash accepted a pipe as content");
+        assert!(copy_refused, "the vendor copy accepted a pipe as content");
+        // The scanner names the pipe, and still runs its path-only
+        // checks on it. A guard at the walk dropped both, so a pipe
+        // named payload.sh at a skill root scanned as clean.
+        assert!(
+            flags
+                .iter()
+                .any(|f| f.path.contains("pipe.md") && f.what.contains("not a regular file")),
+            "the scanner did not name the pipe: {flags:?}"
+        );
 
         let names: Vec<&str> = files.iter().map(|(n, _)| n.as_str()).collect();
         assert!(

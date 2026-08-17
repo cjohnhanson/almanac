@@ -383,7 +383,12 @@ pub fn list(dir: &Path) -> Result<(), Error> {
         let state = if vendored.is_dir() {
             match hash_tree(&vendored) {
                 Ok(h) if h == entry.sha256 => "clean",
-                _ => "drifted",
+                Ok(_) => "drifted",
+                // A tree the hash refuses has not drifted; it holds
+                // something that cannot be part of a skill. sync
+                // already says so, and status said drifted for a
+                // library that had not moved.
+                Err(_) => "unreadable",
             }
         } else {
             "missing"
