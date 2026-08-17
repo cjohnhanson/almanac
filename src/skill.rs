@@ -136,24 +136,23 @@ fn show_reference(
             let SkillLocation::File(path) = &entry.source;
             let skill_dir = Path::new(path).parent().unwrap_or_else(|| Path::new("."));
             let refs_dir = skill_dir.join("references");
-            let ref_path = refs_dir.join(ref_file);
 
-            // A library may be content somebody else controls, so the
-            // resolved file must still be inside the references
-            // directory, and it must be a regular file rather than a
-            // link to one somewhere else.
-            let (Ok(base), Ok(resolved)) = (refs_dir.canonicalize(), ref_path.canonicalize())
-            else {
+            // A library may be content somebody else controls, and the
+            // reference name arrives from caller text. The handle
+            // confines it to the references directory, so a name that
+            // climbs out is refused by the operating system.
+            //
+            // This was a canonicalize and a starts_with. Between the
+            // check and the open, the path could change; the handle
+            // has no such gap, because there is no second lookup.
+            let Ok(refs) = mdstore::confined::StoreDir::open(&refs_dir) else {
                 return Ok(None);
             };
-            if !resolved.starts_with(&base) {
+            if !refs.is_document(ref_file) {
                 return Ok(None);
             }
-            if !mdstore::store::is_regular_file(&resolved) {
-                return Ok(None);
-            }
-            let content = mdstore::store::read_document(&resolved).map_err(|e| {
-                Error::General(format!("failed to read {}: {e}", resolved.display()))
+            let content = refs.read(ref_file).map_err(|e| {
+                Error::General(format!("failed to read {ref_file} in references: {e}"))
             })?;
             return Ok(Some(content));
         }
@@ -268,7 +267,12 @@ fn parse_skill_md(skill_md: &Path, skill_dir: &Path) -> Result<SkillEntry, Error
     // A skill directory can hold a symlinked SKILL.md pointing at a
     // file outside the library. The guard refuses anything that is not
     // a regular file.
-    let content = mdstore::store::read_document(skill_md)
+    let name = skill_md
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| Error::General(format!("{} has no file name", skill_md.display())))?;
+    let content = mdstore::confined::StoreDir::open(skill_dir)
+        .and_then(|dir| dir.read(name))
         .map_err(|e| Error::General(format!("failed to read {}: {e}", skill_md.display())))?;
 
     // mdstore parses the frontmatter, so almanac, zettel, and tisket
@@ -627,6 +631,54 @@ mod tests {
         let output = show_to_string("my-skill/references/deep-dive.md", dir.path(), &sources);
         assert!(output.contains("# Deep Dive"));
         assert!(output.contains("Detailed content."));
+    }
+
+    /// A reference name is caller text and reaches this from a
+    /// published library. The handle refuses a name that leaves the
+    /// references directory, and refuses a link that points out of it.
+    #[test]
+    fn a_reference_cannot_leave_the_references_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let sources = make_skill_with_refs(dir.path());
+        std::fs::write(dir.path().join("secret.md"), "SECRET").unwrap();
+
+        for name in [
+            "../../secret.md",
+            "../SKILL.md",
+            "/etc/hosts",
+            "..",
+            ".",
+            "a/b.md",
+        ] {
+            let out = show_reference("my-skill", name, dir.path(), &sources).unwrap();
+            assert!(out.is_none(), "{name} was read");
+        }
+
+        // A link planted inside the references directory is refused by
+        // type, not followed. A predicate that canonicalized first
+        // accepted this, because the resolved path was checked and the
+        // open happened afterwards.
+        let refs = dir.path().join("skills/my-skill/references");
+        std::os::unix::fs::symlink(dir.path().join("secret.md"), refs.join("planted.md")).unwrap();
+        let out = show_reference("my-skill", "planted.md", dir.path(), &sources).unwrap();
+        assert!(out.is_none(), "a planted link was followed");
+
+        // A link whose target sits inside the references directory is
+        // still refused. This is what separates the handle from the
+        // canonicalize-and-compare it replaced: that predicate asked
+        // where the link pointed, and accepted it whenever the answer
+        // was 'inside'. A library the reader does not control decides
+        // what its files are, and a link is not a file.
+        std::os::unix::fs::symlink("examples.md", refs.join("inside.md")).unwrap();
+        let out = show_reference("my-skill", "inside.md", dir.path(), &sources).unwrap();
+        assert!(
+            out.is_none(),
+            "a link inside the references directory was followed"
+        );
+
+        // What genuinely sits there still reads.
+        let good = show_reference("my-skill", "examples.md", dir.path(), &sources).unwrap();
+        assert!(good.is_some_and(|c| c.contains("Some examples")));
     }
 
     #[test]
