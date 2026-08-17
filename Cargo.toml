@@ -90,3 +90,11 @@ gix = { version = "0.86", default-features = false, features = [
 
 [dev-dependencies]
 tempfile = "3.26.0"
+
+# A released binary carries no debug symbols, and a user installing a
+# CLI never reads them. Thin LTO with one codegen unit trades build
+# time for size and speed. A release builds once and installs often.
+[profile.release]
+strip = "symbols"
+lto = "thin"
+codegen-units = 1
