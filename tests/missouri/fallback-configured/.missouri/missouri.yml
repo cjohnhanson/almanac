@@ -1,7 +1,7 @@
 doc: |
   The user-level fallback. A cwd with no library reads the configured
   root library and says so; a write refuses and names --home. Every
-  command passes --user-config so the real ~/.config/mdstore/config.yml
+  command passes --user-config so the real ~/.config/almanac/config.yml
   never participates.
 assertions:
   - name: "a read from a libraryless cwd falls back and announces it"
