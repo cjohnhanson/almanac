@@ -216,8 +216,9 @@ cache.
 Show or set the root library that reads fall back to. `almanac store
 root` prints the current setting; `almanac store root <path>` writes it
 to `~/.config/almanac/config.yml` (the path must hold `almanac.yml`;
-changing an existing setting needs `--force`). The file is shared with
-tisket and zettel, so one private repo serves all three tools.
+changing an existing setting needs `--force`). Each tool reads its own
+file, so this one names the root store for almanac alone. One private repo
+can still serve all three, named once in each.
 
 ## `almanac store sync`
 
