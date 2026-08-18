@@ -12,7 +12,7 @@ setup:
   - name: "build almanac"
     command: "cargo build --quiet --manifest-path ../../Cargo.toml"
   # A wrapper, not a symlink: it pins --user-config to a path that
-  # never exists, so the machine's real ~/.config/mdstore/config.yml
+  # never exists, so the machine's real ~/.config/almanac/config.yml
   # cannot leak a root-library fallback into the suite. The flag's last
   # occurrence wins, so a test that needs a config passes its own.
   - name: "wrap binary"

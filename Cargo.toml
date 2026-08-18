@@ -30,7 +30,7 @@ clap_mangen = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 yaml_serde = "0.10"
-mdstore = { git = "https://github.com/cjohnhanson/mdstore", rev = "bf12ff1", features = ["mcp"] }
+mdstore = { git = "https://github.com/cjohnhanson/mdstore", rev = "ea739c4", features = ["mcp"] }
 dirs = "6"
 thiserror = "2"
 sigpipe = "0.1.3"

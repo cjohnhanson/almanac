@@ -214,7 +214,7 @@ impl Workspace {
     }
 
     fn open_with(root: &Path, fetching: bool) -> Result<Self, Error> {
-        let registry = mdstore::registry::Registry::load().unwrap_or_default();
+        let registry = mdstore::registry::Registry::load(crate::TOOL).unwrap_or_default();
         let graph = if fetching {
             StoreGraph::open(
                 root,
