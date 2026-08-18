@@ -9,6 +9,24 @@ first.
 
 ## Install
 
+From the first published release onward:
+
+```sh
+cargo install lmnc
+```
+
+The crate is `lmnc` and the command is `almanac`. `almanac` on crates.io
+belongs to an unrelated project, and a registry name is first-come and
+permanent, so this crate took a free one. The command a person types
+did not change.
+
+A tagged release also carries a prebuilt binary for macOS and Linux,
+on x86-64 and arm64. Take the archive for your platform from the
+[releases page](https://github.com/cjohnhanson/almanac/releases) and
+put `almanac` on your `PATH`.
+
+To build from a checkout:
+
 ```sh
 cargo install --git https://github.com/cjohnhanson/almanac
 ```
