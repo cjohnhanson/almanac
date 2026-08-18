@@ -128,11 +128,11 @@ Read `almanac docs composition` for the model.
 
 Plaintext, git-tracked, agent-readable tools:
 
-- [tisket](https://github.com/cjohnhanson/tisket) — file-based issue tracker
-- [zettel](https://github.com/cjohnhanson/zettel) — zettelkasten knowledge base
-- [belmont](https://github.com/cjohnhanson/belmont) — secrets manager for LLM agents
-- [mdstore](https://github.com/cjohnhanson/mdstore) — frontmattered markdown library
-- [codelikecody](https://github.com/cjohnhanson/codelikecody) — workflow engine that bundles these
+- [tisket](https://github.com/cjohnhanson/tisket) — issue tracker. Markdown issues with YAML frontmatter, in the repository
+- [zettel](https://github.com/cjohnhanson/zettel) — zettelkasten notes for a repository
+- [gaff](https://github.com/cjohnhanson/gaff) — context-lifecycle handler for coding agents
+- [missouri](https://github.com/cjohnhanson/missouri) — end-to-end tests as directed graphs of filesystem states
+- [mdstore](https://github.com/cjohnhanson/mdstore) — the frontmattered markdown library almanac indexes skills with
 
 ## License
 
