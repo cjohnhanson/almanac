@@ -457,12 +457,12 @@ pub fn run(args: Args) -> Result<(), Error> {
 const VOCAB: mdstore::resolve::Vocabulary<'static> = mdstore::resolve::Vocabulary {
     marker: "almanac.yml",
     noun: "library",
-    tool: "almanac",
+    tool: crate::TOOL,
 };
 
 fn load_user_config(path: Option<&Path>) -> Result<mdstore::userconfig::UserConfig, Error> {
     path.map_or_else(
-        mdstore::userconfig::UserConfig::load,
+        || mdstore::userconfig::UserConfig::load(VOCAB.tool),
         mdstore::userconfig::UserConfig::load_from,
     )
     .map_err(|e| Error::General(e.to_string()))
@@ -502,14 +502,20 @@ fn announce(root: &Path, cwd: &Path, via: mdstore::resolve::Via, intent: mdstore
 }
 
 /// `almanac store root [<path>] [--force]`: show or set the root
-/// library in ~/.config/mdstore/config.yml. Rootless, and acts on its
+/// library in ~/.config/almanac/config.yml. Rootless, and acts on its
 /// literal argument; resolution here would be circular.
 fn run_store_root(args: &StoreRootArgs, user_config: Option<&Path>) -> Result<(), Error> {
     let config = load_user_config(user_config)?;
     let Some(path) = &args.path else {
-        match config.root_store {
-            Some(r) => println!("root_store: {} (~/.config/mdstore/config.yml)", r.display()),
-            None => println!("root_store: unset"),
+        // The file that was read, never a literal: --user-config makes
+        // any fixed path a possible lie.
+        let read_from = user_config
+            .map(std::path::Path::to_path_buf)
+            .or_else(|| mdstore::userconfig::config_path(crate::TOOL));
+        match (&config.root_store, &read_from) {
+            (Some(r), Some(f)) => println!("root_store: {} ({})", r.display(), f.display()),
+            (Some(r), None) => println!("root_store: {}", r.display()),
+            (None, _) => println!("root_store: unset"),
         }
         return Ok(());
     };
@@ -547,10 +553,10 @@ fn run_store_root(args: &StoreRootArgs, user_config: Option<&Path>) -> Result<()
         println!("root_store: {} (unchanged)", abs.display());
         return Ok(());
     }
-    let old = config.root_store.clone();
+    let old = config.root_store;
     let target = user_config
         .map(std::path::Path::to_path_buf)
-        .or_else(mdstore::userconfig::config_path)
+        .or_else(|| mdstore::userconfig::config_path(VOCAB.tool))
         .ok_or_else(|| Error::General("no home directory resolves".to_string()))?;
     mdstore::userconfig::UserConfig::save_root_to(&target, &abs)
         .map_err(|e| Error::General(e.to_string()))?;

@@ -31,7 +31,7 @@ tisket and zettel: the nearest `almanac.yml` at or above the working
 directory wins. The walk requires a regular file and stops at the first
 directory the invoking user does not own, so a marker planted in a
 shared ancestor captures nothing. With no library found, a read falls
-back to the root library set in `~/.config/mdstore/config.yml` and says
+back to the root library set in `~/.config/almanac/config.yml` and says
 so on stderr; a write never falls back — it fails and names `--home`.
 No environment variable participates. The config path is fixed, and the
 home directory comes from the passwd database, not `$HOME`: both are
@@ -215,9 +215,10 @@ cache.
 
 Show or set the root library that reads fall back to. `almanac store
 root` prints the current setting; `almanac store root <path>` writes it
-to `~/.config/mdstore/config.yml` (the path must hold `almanac.yml`;
-changing an existing setting needs `--force`). The file is shared with
-tisket and zettel, so one private repo serves all three tools.
+to `~/.config/almanac/config.yml` (the path must hold `almanac.yml`;
+changing an existing setting needs `--force`). Each tool reads its own
+file, so this one names the root store for almanac alone. One private repo
+can still serve all three, named once in each.
 
 ## `almanac store sync`
 
