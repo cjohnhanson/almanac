@@ -1,6 +1,7 @@
 <!-- metadata
 title: Curation and pinning
-description: The manifest workflow: add, sync, update, drift, and the trust model.
+description: "The manifest workflow: add, sync, update, drift, and the trust model."
+type: explanation
 -->
 
 # Curation and pinning
