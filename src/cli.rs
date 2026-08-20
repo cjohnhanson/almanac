@@ -2,7 +2,6 @@ use std::path::Path;
 
 use clap::Parser;
 
-use crate::docs;
 use crate::error::Error;
 use crate::skill;
 use crate::source::SkillSource;
@@ -48,7 +47,7 @@ const fn intent(command: &Command) -> Option<mdstore::resolve::Intent> {
         Command::GenMan { .. }
         | Command::GenCompletions { .. }
         | Command::Prime
-        | Command::Docs { .. }
+        | Command::Docs(_)
         | Command::Init { .. }
         | Command::Store(StoreCommand::Root(_)) => return None,
         // With explicit --source directories, listing needs no library
@@ -186,13 +185,14 @@ pub enum Command {
     /// Print what almanac is and how to use it, for an agent's context.
     Prime,
     /// Browse bundled documentation.
-    Docs {
-        /// Topic slug to print, or "search" to search.
-        topic: Option<String>,
-        /// Search query. Used when the topic is "search".
-        query: Option<String>,
-    },
+    Docs(diataxis::DocsArgs),
 }
+
+/// This tool's own documentation, compiled in.
+///
+/// The build script embedded every page in `docs/`, so nothing here
+/// lists them and `almanac docs` works from any directory.
+static DOCS: &[(&str, &str)] = diataxis::embedded_docs!();
 
 /// The prime: what almanac is, for an agent's context.
 ///
@@ -279,7 +279,7 @@ pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Re
             print!("{}", prime());
             Ok(())
         }
-        Command::Docs { topic, query } => cmd_docs(topic.as_deref(), query.as_deref()),
+        Command::Docs(args) => cmd_docs(&args),
         Command::Init { library } => crate::ops::init(root, &library),
         Command::Add {
             source,
@@ -674,36 +674,19 @@ fn reachable_skills(root: &Path, sources: &[SkillSource]) -> Vec<skill::SkillEnt
     entries
 }
 
-fn cmd_docs(topic: Option<&str>, query: Option<&str>) -> Result<(), Error> {
-    match topic {
-        None | Some("list") => {
-            print!("{}", docs::format_list(docs::PAGES));
+fn cmd_docs(args: &diataxis::DocsArgs) -> Result<(), Error> {
+    let set = diataxis::DocSet::from_embedded(DOCS).map_err(|e| Error::General(e.to_string()))?;
+    let request = args.request().map_err(|e| Error::General(e.to_string()))?;
+    match set.render(request) {
+        Ok(text) => {
+            print!("{text}");
             Ok(())
         }
-        Some("search") => {
-            let q = query.unwrap_or("");
-            if q.is_empty() {
-                return Err(Error::General(
-                    "usage: almanac docs search <query>".to_string(),
-                ));
-            }
-            let matches = docs::find_matching(docs::PAGES, q);
-            if matches.is_empty() {
-                eprintln!("no docs matching '{q}'");
-            } else {
-                print!("{}", docs::format_list_from_refs(&matches));
-            }
-            Ok(())
-        }
-        Some(identifier) => {
-            if let Some(page) = docs::find(identifier) {
-                print!("{}", page.content());
-                return Ok(());
-            }
-            eprintln!("unknown doc: {identifier}");
+        Err(e) => {
+            eprintln!("{e}");
             eprintln!();
-            print!("{}", docs::format_list(docs::PAGES));
-            Err(Error::General(format!("doc '{identifier}' not found")))
+            print!("{}", set.listing());
+            Err(Error::General(e.to_string()))
         }
     }
 }

@@ -1,5 +1,4 @@
 pub mod cli;
-pub mod docs;
 pub mod error;
 pub mod flags;
 pub mod hash;
