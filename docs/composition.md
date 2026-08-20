@@ -1,6 +1,7 @@
 <!-- metadata
 title: Composed libraries
 description: Declaring other libraries, name precedence, and skill requirements.
+type: explanation
 -->
 
 # Composed libraries
