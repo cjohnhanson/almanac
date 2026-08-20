@@ -1,0 +1,5 @@
+signoff[review-tests] PASS 350f7b4c880404b1eff4943f44e55a1414a001a4 the failing verify run named the cause, and the fix was checked against the action definition rather than guessed
+signoff[review-docs] PASS 350f7b4c880404b1eff4943f44e55a1414a001a4 the comment states why run is false, and gaff check reports no drift between config and workflow
+signoff[review-code] PASS 350f7b4c880404b1eff4943f44e55a1414a001a4 the action already carried the input; no new step and no duplicated install
+signoff[review-deps] PASS 350f7b4c880404b1eff4943f44e55a1414a001a4 no package manifest changed and no new action was introduced
+signoff[review-usability] PASS 350f7b4c880404b1eff4943f44e55a1414a001a4 a push now runs the suites and no review check, which is what the split promised
