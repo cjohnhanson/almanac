@@ -9,21 +9,32 @@ first.
 
 ## Install
 
-From the first published release onward:
+Pick the line for a tool you already use. Every one installs the same
+binary. Each gives you both the `almanac` and `lmnc` commands.
+
+Run it without installing:
+
+```sh
+uvx lmnc
+npx lmnc
+```
+
+Install it for good:
 
 ```sh
 cargo install lmnc
+uv tool install lmnc
+npm install -g lmnc
+brew install cjohnhanson/tap/almanac
 ```
 
-The crate is `lmnc` and the command is `almanac`. `almanac` on crates.io
-belongs to an unrelated project, and a registry name is first-come and
-permanent, so this crate took a free one. The command a person types
-did not change.
+The published name is `lmnc`, because `almanac` was already taken on every registry.
+Both commands install together, so `almanac` is what you type.
 
-A tagged release also carries a prebuilt binary for macOS and Linux,
-on x86-64 and arm64. Take the archive for your platform from the
-[releases page](https://github.com/cjohnhanson/almanac/releases) and
-put `almanac` on your `PATH`.
+A tagged release also carries a prebuilt binary and the man page, for
+macOS and Linux on x86-64 and arm64. Take the archive for your platform
+from the [releases page](https://github.com/cjohnhanson/almanac/releases),
+put `almanac` on your `PATH`, and put `man/almanac.1` where `man` looks.
 
 To build from a checkout:
 
