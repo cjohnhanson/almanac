@@ -260,6 +260,12 @@ fn to_mcp_error(e: &Error) -> McpError {
     McpError::internal_error(e.to_string(), None)
 }
 
+// The trait declares these methods async, so the signatures are not ours
+// to change. A method that never awaits still has to match the trait, and
+// clippy reads the `async` as stray. The allow sits on the impl because
+// the trait is macro-generated and an attribute on one method does not
+// survive the expansion.
+#[allow(clippy::unused_async_trait_impl)]
 impl ServerHandler for AlmanacServer {
     fn get_info(&self) -> InitializeResult {
         let mut capabilities = ServerCapabilities::default();
