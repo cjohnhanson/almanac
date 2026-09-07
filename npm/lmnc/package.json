@@ -13,9 +13,9 @@
   },
   "license": "MIT",
   "optionalDependencies": {
-    "@lmnc/cli-darwin-arm64": "0.0.0",
-    "@lmnc/cli-darwin-x64": "0.0.0",
-    "@lmnc/cli-linux-arm64-musl": "0.0.0",
-    "@lmnc/cli-linux-x64-musl": "0.0.0"
+    "@cjohnhanson/lmnc-darwin-arm64": "0.0.0",
+    "@cjohnhanson/lmnc-darwin-x64": "0.0.0",
+    "@cjohnhanson/lmnc-linux-arm64-musl": "0.0.0",
+    "@cjohnhanson/lmnc-linux-x64-musl": "0.0.0"
   }
 }
