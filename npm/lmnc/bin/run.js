@@ -16,12 +16,12 @@ const os = require("os");
 // host libc is needed.
 const PLATFORMS = {
   darwin: {
-    arm64: "@lmnc/cli-darwin-arm64/almanac",
-    x64: "@lmnc/cli-darwin-x64/almanac",
+    arm64: "@cjohnhanson/lmnc-darwin-arm64/almanac",
+    x64: "@cjohnhanson/lmnc-darwin-x64/almanac",
   },
   linux: {
-    arm64: "@lmnc/cli-linux-arm64-musl/almanac",
-    x64: "@lmnc/cli-linux-x64-musl/almanac",
+    arm64: "@cjohnhanson/lmnc-linux-arm64-musl/almanac",
+    x64: "@cjohnhanson/lmnc-linux-x64-musl/almanac",
   },
 };
 
