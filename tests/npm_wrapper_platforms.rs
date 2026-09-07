@@ -71,8 +71,8 @@ fn generated_package_names() -> Vec<String> {
         };
         let libc = between(line, "libc: \"", "\"");
         names.push(libc.map_or_else(
-            || format!("cli-{os}-{cpu}"),
-            |l| format!("cli-{os}-{cpu}-{l}"),
+            || format!("lmnc-{os}-{cpu}"),
+            |l| format!("lmnc-{os}-{cpu}-{l}"),
         ));
     }
     assert!(!names.is_empty(), "no targets parsed from npm/generate.mjs");
@@ -217,13 +217,13 @@ fn referenced_package_names() -> Vec<String> {
     let src = std::fs::read_to_string("npm/lmnc/bin/run.js").expect("wrapper");
     let mut names = Vec::new();
     for line in src.lines() {
-        let Some(rest) = line.split("@lmnc/").nth(1) else {
+        let Some(rest) = line.split("@cjohnhanson/").nth(1) else {
             continue;
         };
         let Some(name) = rest.split('/').next() else {
             continue;
         };
-        if name.starts_with("cli-") {
+        if name.starts_with("lmnc-") {
             names.push(name.to_string());
         }
     }
