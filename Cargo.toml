@@ -96,3 +96,22 @@ tempfile = "3.26.0"
 # documentation set the `docs` subcommand reads.
 [build-dependencies]
 diataxis = { version = "0.1", default-features = false, features = ["build"] }
+
+# `cargo deb` reads this. It produces target/debian/*.deb, which the
+# release attaches to the GitHub release. Installing that file is
+# `dpkg -i`, and it is not an apt repository: `apt-get install almanac`
+# needs a hosted, signed repository that does not exist yet.
+[package.metadata.deb]
+maintainer = "cjohnhanson <cody@codyjhanson.com>"
+section = "utils"
+priority = "optional"
+depends = "$auto"
+extended-description = "Almanac curates agent skills and indexes them for agents to read"
+assets = [
+    ["target/release/almanac", "usr/bin/", "755"],
+    # The short name ships too, so the rule holds on apt: install under
+    # one name and both commands work.
+    ["target/release/lmnc", "usr/bin/", "755"],
+    ["README.md", "usr/share/doc/almanac/README", "644"],
+    ["LICENSE", "usr/share/doc/almanac/LICENSE", "644"],
+]
