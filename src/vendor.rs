@@ -96,7 +96,12 @@ fn reach(url: &str) -> Result<Reach, VendorError> {
         gix::url::Scheme::Ssh => Err(VendorError::Git(format!(
             "{url}: an ssh transport needs an ssh process, and almanac spawns none; use https"
         ))),
-        gix::url::Scheme::Ext(s) => Err(VendorError::Git(format!("{url}: unsupported scheme {s}"))),
+        // gix 0.87 made Ext a unit variant and added two helper forms.
+        // None of the three names a transport almanac can use, and Ext
+        // no longer carries the scheme text, so the url reports it.
+        gix::url::Scheme::Ext | gix::url::Scheme::Helper(_) | gix::url::Scheme::HelperUrl(_) => {
+            Err(VendorError::Git(format!("{url}: unsupported scheme")))
+        }
     }
 }
 
