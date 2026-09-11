@@ -1,19 +1,21 @@
 #!/bin/sh
 # Everything that must be true before this crate publishes.
 #
-# Written after 0.1.0 published a lib that does not compile under
-# `--no-default-features --features store`, which is how two of five
-# consumers take it. `cargo test --all-features` passed, and that was
-# read as proof. A pass on one feature set says nothing about the rest.
+# One feature set is not a feature matrix. A consumer can take the
+# crate with any combination of features, so a green
+# `cargo test --all-features` proves nothing about the combination that
+# consumer picked. cargo-hack reads the feature list from cargo
+# metadata and walks the powerset, so no feature is silently skipped.
 #
-# The first version of this script parsed feature names out of
-# Cargo.toml with awk. A reviewer showed it silently dropped any name
-# holding a digit, a capital, quotes or leading whitespace, and never
-# tried a combination. A silent skip is the class of failure that
-# shipped 0.1.0, so the parsing is cargo-hack's now: it reads features
-# from cargo metadata and walks the powerset.
+# A registry keeps a published version forever. Every check below runs
+# while the version can still change.
 set -eu
-TC="${TOOLCHAIN:-1.98.0}"
+[ -f rust-toolchain.toml ] || {
+	echo "  prepublish: run this from the repository root, where rust-toolchain.toml is." >&2
+	exit 1
+}
+# The toolchain rust-toolchain.toml pins, so the version has one home.
+TC="${TOOLCHAIN:-$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)}"
 fail=0
 say() { printf '  %-46s %s\n' "$1" "$2"; }
 
@@ -36,10 +38,20 @@ run() {
 	fi
 }
 
-if ! cargo hack --version >/dev/null 2>&1; then
-	echo "  prepublish: cargo-hack is missing. cargo install cargo-hack" >&2
+# Every program the checks call, named before the first check runs. A
+# missing one is then one line, not a failure halfway through.
+for tool in cargo-hack cargo-audit rustup python3 curl; do
+	case "$tool" in
+	cargo-*) cargo "${tool#cargo-}" --version >/dev/null 2>&1 && continue ;;
+	*) command -v "$tool" >/dev/null 2>&1 && continue ;;
+	esac
+	case "$tool" in
+	cargo-*) echo "  prepublish: $tool is missing. cargo install $tool" >&2 ;;
+	rustup) echo "  prepublish: rustup is missing. https://rustup.rs" >&2 ;;
+	*) echo "  prepublish: $tool is missing. Install it with the system package manager." >&2 ;;
+	esac
 	exit 1
-fi
+done
 
 # --no-dev-deps and --all-targets are mutually exclusive in cargo-hack,
 # so the pair turns this line into an error rather than a check.

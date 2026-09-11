@@ -135,8 +135,8 @@ A served library has none. The server answers whoever opens the
 connection.
 
 Authentication belongs in front of the server, in a program built for
-it: a reverse proxy that terminates TLS and checks a token or an
-identity provider.
+it. A reverse proxy terminates TLS and checks a token or an identity
+provider.
 
 Bind to `127.0.0.1` for a client on this machine. To serve anybody
 else, put the server behind a proxy that authenticates, and let the
