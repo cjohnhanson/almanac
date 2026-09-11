@@ -1,6 +1,6 @@
 ---
 name: almanac
-description: Curate a pinned library of agent skills with almanac. Vendor skills from git repositories or local paths into a manifest-governed directory, detect drift, gate updates behind diffs and red-flag scans, and print a markdown skills index for context injection. Use when adding a skill to a repository's curated library, checking library integrity, or updating pinned skills.
+description: Curate a pinned library of agent skills with almanac. Vendor skills from git or local paths, detect drift, gate updates behind diffs, and print a skills index. Use when adding, checking, or updating a repository's skills.
 ---
 
 # almanac

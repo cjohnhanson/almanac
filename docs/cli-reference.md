@@ -203,9 +203,24 @@ Read the bundled almanac documentation.
 almanac docs                    List the available docs and their slugs
 almanac docs list               Same as bare `almanac docs`
 almanac docs <identifier>       Print one doc by slug, title, or unique prefix
-almanac docs search <query>     Search every doc
+almanac docs search <query>     List the docs that carry the query
+almanac docs --all              Print every doc, in one stream
 ```
 
+### `almanac serve`
+
+Serve this library over MCP. The server is read-only, and it has no
+authentication; `almanac docs composition` says what to put in front
+of it.
+
+```
+almanac serve [--surfaces <list>] [--bind <addr>]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--surfaces <list>` | `skills,tools` | The surfaces to offer, separated by commas: `skills`, `resources`, `tools`. |
+| `--bind <addr>` | (none) | Where to listen, for a client that connects over HTTP. Omitted, the server speaks on stdin and stdout for a client that starts it. |
 
 ## `almanac store list`
 
