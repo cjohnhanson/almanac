@@ -114,7 +114,8 @@ configuration.
 
 - `skills`: the skills extension, `skills/list` and `skills/get`. The
   server returns each skill's frontmatter as written and a digest for
-  each of its files, which is what the extension asks a host to verify.
+  each of its files. That digest is what the extension asks a host to
+  verify.
   Almanac already pins content by SHA-256, so the digests are the same
   ones the manifest uses.
 - `resources`: one readable resource for each file, at

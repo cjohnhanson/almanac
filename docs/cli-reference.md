@@ -28,9 +28,8 @@ runs.
 
 Without `--root`, a command finds its library by one rule: the nearest
 `almanac.yml` at or above the working directory wins. The walk requires
-a regular file, and it stops at the first directory the invoking user
-does not own, so a marker planted in a shared ancestor captures
-nothing.
+a regular file. It stops at the first directory the invoking user does
+not own, so a marker planted in a shared ancestor captures nothing.
 
 With no library found, a read falls back to the root library set in
 `~/.config/almanac/config.yml`, and it says so on stderr. A write never
