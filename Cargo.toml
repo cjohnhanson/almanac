@@ -5,11 +5,11 @@ name = "lmnc"
 version = "0.2.0"
 edition = "2024"
 # 1.88, read from the graph rather than from the edition. Edition 2024
-# needs 1.85, and 1.85 was declared here and was false: this crate calls
-# items stable in a const context only from 1.87, and a locked
-# dependency asks for 1.88 itself. A floor that is too low is worse than
-# none, because a consumer takes it and meets an error from inside the
-# crate anyway. clippy reads this line and checks against it.
+# needs 1.85, and 1.85 covers the edition and not this crate: the crate
+# calls items that are stable in a const context only from 1.87, and a
+# locked dependency asks for 1.88 itself. A floor that is too low is
+# worse than none, because a consumer takes it and meets an error from
+# inside the crate anyway. clippy reads this line and checks against it.
 rust-version = "1.88"
 description = "Almanac curates agent skills and indexes them for agents to read"
 license = "MIT"

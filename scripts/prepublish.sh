@@ -4,7 +4,7 @@
 # Written after 0.1.0 published a lib that does not compile under
 # `--no-default-features --features store`, which is how two of five
 # consumers take it. `cargo test --all-features` passed, and that was
-# read as proof. One feature set is not a feature matrix.
+# read as proof. A pass on one feature set says nothing about the rest.
 #
 # The first version of this script parsed feature names out of
 # Cargo.toml with awk. A reviewer showed it silently dropped any name
@@ -16,11 +16,20 @@ set -eu
 TC="${TOOLCHAIN:-1.98.0}"
 fail=0
 say() { printf '  %-46s %s\n' "$1" "$2"; }
+
+# A refusal prints why. With both streams sent to /dev/null every
+# failure reads as a bare FAILS, a full disk and a real packaging fault
+# look the same, and telling them apart means running the command again
+# by hand.
 run() {
 	label="$1"
 	shift
-	if "$@" >/dev/null 2>&1; then say "$label" ok; else
+	out=$("$@" 2>&1)
+	if [ $? -eq 0 ]; then
+		say "$label" ok
+	else
 		say "$label" FAILS
+		printf '%s\n' "$out" | tail -12 | sed 's/^/      /'
 		fail=1
 	fi
 }
@@ -31,7 +40,7 @@ if ! cargo hack --version >/dev/null 2>&1; then
 fi
 
 # --no-dev-deps and --all-targets are mutually exclusive in cargo-hack,
-# and the pair silently made this line an error rather than a check.
+# so the pair turns this line into an error rather than a check.
 run "check, every feature alone" rustup run "$TC" cargo hack check --each-feature --no-dev-deps
 run "check, every feature, tests" rustup run "$TC" cargo hack check --each-feature --all-targets
 # The powerset without --all-targets: building every test once per
@@ -59,9 +68,9 @@ run "publish dry run" sh -c "cd '$tmp' && rustup run '$TC' cargo publish --locke
 #
 # Read the status code, not curl's exit code. `curl -sf` exits nonzero
 # for a 404, and equally for a DNS failure, a refused connection and a
-# 5xx, so every one of those read as "unpublished" and let the publish
-# through. Only 404 means the version is free. Anything else is an
-# answer this check did not get, and an unanswered check refuses.
+# 5xx, so every one of those reads as "unpublished" and lets the
+# publish through. Only 404 means the version is free. Anything else is
+# an answer this check did not get, and an unanswered check refuses.
 meta=$(rustup run "$TC" cargo metadata --no-deps --format-version 1)
 name=$(printf '%s' "$meta" | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["name"])')
 ver=$(printf '%s' "$meta" | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["version"])')

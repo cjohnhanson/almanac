@@ -22,9 +22,12 @@ are credited unless you ask otherwise.
 
 ## Scope
 
-almanac indexes agent skills from pluggable sources, and serves them over the Model Context Protocol. A source may be a local path, a git repository, or an https prefix.
+almanac indexes agent skills from a local path, a git repository, or an
+https prefix, and serves them over the Model Context Protocol.
 
-A skill library is third-party content by design, and a skill is instructions an agent reads and may act on. What a library can reach, and what a skill can say, are both boundaries worth attacking.
+A skill library holds content that somebody else controls, and a skill
+is instructions an agent reads and may act on. What a library can
+reach, and what a skill can say, are both worth attacking.
 
 In scope:
 
@@ -32,7 +35,8 @@ In scope:
   it should be confined to.
 - A fetch reaching a host or a path that no declaration named.
 - Reading untrusted content leading to code execution.
-- A skill or a reference resolving to a file outside the library that declared it.
+- A skill or a reference resolving to a file outside the library that
+  declared it.
 - The MCP server answering for a path outside the library it serves.
 
 Out of scope:
@@ -44,6 +48,7 @@ Out of scope:
 
 ## Known boundaries
 
-Documented limits are not vulnerabilities. `src/confined.rs` carries a
-`# What this does not cover` section in its module documentation. Read
-it before reporting a traversal issue.
+Documented limits are not vulnerabilities. The `confined` module of the
+`mdstore-core` dependency confines a path to the library that holds it.
+Its module documentation carries a `# What this does not cover`
+section. Read that section before you report a traversal issue.
