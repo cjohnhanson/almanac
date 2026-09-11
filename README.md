@@ -54,12 +54,12 @@ almanac docs [topic]          # the bundled documentation
 
 ## How it works
 
-`almanac.yml` governs one library directory. almanac pins every entry
-to a commit and a content hash. almanac stamps every vendored directory
-as managed. `add` trusts a source on first use: it runs a mechanical
+`almanac.yml` governs one library directory. Almanac pins every entry
+to a commit and a content hash, and stamps every vendored directory as
+managed. `add` trusts a source on first use: it runs a mechanical
 red-flag scan, and it needs an explicit `--accept`. `update` shows the
-upstream diff and a fresh scan before it re-pins. `sync --check` fails
-when a pinned entry drifts. No change lands without a report.
+upstream diff and a fresh scan before it re-pins, and `sync --check`
+fails when a pinned entry drifts.
 
 ```yaml
 library: skills
@@ -80,12 +80,12 @@ use it, for an agent's context; it depends only on the binary version.
 
 ## Sources
 
-- `github:owner/repo` (or bare `owner/repo`) — pinned by commit and hash
-- `git:<url>` — any git server over https, git://, or a local path.
-  almanac tries a sha fetch, then the recorded ref, then a full fetch,
-  all in-process on gix; no git program runs. An ssh URL is refused,
+- `github:owner/repo` (or bare `owner/repo`): pinned by commit and hash.
+- `git:<url>`: any git server over https, git://, or a local path.
+  Almanac tries a sha fetch, then the recorded ref, then a full fetch,
+  all in-process on gix. No git program runs. An ssh URL is refused,
   because gix would spawn ssh for it.
-- `dev:<path>` — a local snapshot of a skill you develop alongside.
+- `dev:<path>`: a local snapshot of a skill you develop alongside.
   `sync --check` skips it and reports drift as information.
 
 ## Composed libraries
@@ -102,16 +102,15 @@ stores:
     git: https://example.com/org/skills
 ```
 
-**Precedence.** A skill name is the identity, and two libraries can
-hold the same name. The nearer library wins: this library first, then
-each declared library in declaration order. `list`, `show`, and `index`
-all give the winner, so what you see is what an agent loads.
+A skill name is the identity, and two libraries can hold the same name.
+The nearer library wins: this library first, then each declared library
+in declaration order. `list`, `show`, and `index` all give the winner,
+so the list shows what an agent loads.
 
-A skill that loses a name is not discarded quietly. `almanac check`
-reports every shadowed name and the library it came from, because a
-skill that silently replaced another is the worst way to find out.
+A skill that loses a name stays on disk. `almanac check` reports every
+shadowed name and the library it came from.
 
-**Linking.** A skill declares the skills it needs:
+A skill declares the skills it needs:
 
 ```yaml
 ---
@@ -150,19 +149,20 @@ Read `almanac docs composition` for the model.
 
 ## Documentation
 
-- [What is Almanac?](docs/what-is-almanac.md) — skill format, sources, design
-- [Curation and pinning](docs/curation.md) — the manifest workflow and trust model
-- [CLI Reference](docs/cli-reference.md) — every command and flag
+- [What is Almanac?](docs/what-is-almanac.md): skill format, sources, design
+- [Curation and pinning](docs/curation.md): the manifest workflow and the trust model
+- [CLI reference](docs/cli-reference.md): every command and flag
 
 ## Related
 
-Plaintext, git-tracked, agent-readable tools:
+Tools that keep their data as plaintext in the repository, where an
+agent can read it:
 
-- [tisket](https://github.com/cjohnhanson/tisket) — issue tracker. Markdown issues with YAML frontmatter, in the repository
-- [zettel](https://github.com/cjohnhanson/zettel) — zettelkasten notes for a repository
-- [gaff](https://github.com/cjohnhanson/gaff) — context-lifecycle handler for coding agents
-- [missouri](https://github.com/cjohnhanson/missouri) — end-to-end tests as directed graphs of filesystem states
-- [mdstore](https://github.com/cjohnhanson/mdstore) — the frontmattered markdown library almanac indexes skills with
+- [tisket](https://github.com/cjohnhanson/tisket): an issue tracker. Markdown issues with YAML frontmatter, in the repository
+- [zettel](https://github.com/cjohnhanson/zettel): zettelkasten notes for a repository
+- [gaff](https://github.com/cjohnhanson/gaff): a context-lifecycle handler for coding agents
+- [missouri](https://github.com/cjohnhanson/missouri): end-to-end tests as directed graphs of filesystem states
+- [mdstore](https://github.com/cjohnhanson/mdstore): the frontmattered markdown library almanac indexes skills with
 
 ## License
 

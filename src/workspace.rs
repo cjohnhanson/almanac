@@ -3,17 +3,16 @@
 //!
 //! A library declares the other libraries it draws on, in `stores.yml`,
 //! under local aliases. Two things follow that a single directory
-//! cannot give:
+//! cannot give.
 //!
-//! **Precedence.** A skill name is the identity, and two libraries can
-//! hold the same name. The nearer library wins: this library first,
-//! then each declared library in declaration order. The loser is not
-//! discarded quietly; `check` reports every shadowed name, because a
-//! skill that silently replaced another is the worst way to find out.
+//! A skill name is the identity, and two libraries can hold the same
+//! name. The nearer library wins: this library first, then each
+//! declared library in declaration order. The loser stays on disk, and
+//! `check` reports every shadowed name.
 //!
-//! **Linking.** A skill declares the skills it needs, in a `requires:`
-//! frontmatter key. An entry can name another library: `alias:name`.
-//! `check` reports one that names no skill.
+//! A skill declares the skills it needs, in a `requires:` frontmatter
+//! key. An entry can name another library: `alias:name`. `check`
+//! reports one that names no skill.
 
 use std::path::Path;
 
@@ -68,8 +67,8 @@ impl DocumentSource for SkillSource {
             }
             // One unreadable skill never takes down a library. A bare
             // `?` here is caught one level up, where the whole member
-            // becomes an empty document list, so a served library
-            // answered `[]` for one stray byte.
+            // becomes an empty document list, and a served library
+            // then answers `[]` for one stray byte.
             let text = match content.read(&rel) {
                 Ok(t) => t,
                 Err(e) => {
@@ -162,8 +161,8 @@ fn library_dir_of(content: &StoreContent) -> String {
 /// The subdirectories of a library directory.
 ///
 /// One implementation answers for a local directory and for a git
-/// tree. This held a third copy of it, and a copy is a copy that can
-/// miss the link test.
+/// tree. A second copy here would be a second place for the link test
+/// to go missing.
 fn subdirectories(content: &StoreContent, dir_name: &str) -> Vec<String> {
     content.subdirectories(dir_name)
 }
@@ -437,8 +436,9 @@ impl Workspace {
                 kind: "scan".to_string(),
             });
         }
-        // A declaration the walk could not follow at all. Without this
-        // the closure was silently shorter than the config asked for.
+        // A declaration the walk could not follow at all. Without it
+        // the closure is shorter than the config asked for, and
+        // nothing says so.
         for finding in &self.snapshot.graph.findings {
             findings.push(Finding {
                 subject: "stores.yml".to_string(),
@@ -480,10 +480,10 @@ impl Workspace {
 
     /// The files beside a skill's SKILL.md, each with its bytes.
     ///
-    /// They are resolved against the library that holds the skill, not
-    /// against this one. Resolving against this library read a
-    /// different library's files, or none, and the digest then covered
-    /// bytes that the skill does not contain.
+    /// They resolve against the library that holds the skill, never
+    /// against this one. Resolved against this library, the walk reads
+    /// another library's files or none at all, and the digest then
+    /// covers bytes the skill does not contain.
     #[must_use]
     pub fn skill_files(&self, view: &View<'_>) -> Vec<(String, Vec<u8>)> {
         let member = &self.snapshot.graph.members[view.id.member];
@@ -631,9 +631,9 @@ mod walker_tests {
     /// A named pipe must not stop the walk.
     ///
     /// Opening a pipe to read blocks until a writer arrives, and none
-    /// is coming. Both walkers skipped a link by type and then read
-    /// whatever was left, so a pipe in a skill directory hung the CLI
-    /// and the served library: an agent's tool call never returned.
+    /// is coming. A walk that skips a link by type and then reads
+    /// whatever is left hangs the CLI and the served library, and an
+    /// agent's tool call never returns.
     ///
     /// The walk runs on its own thread, because a regression here
     /// would otherwise hang the suite rather than fail it.
@@ -663,17 +663,16 @@ mod walker_tests {
             panic!("a walk blocked on a named pipe");
         };
 
-        // Every other reader that walks the same directory. The first
-        // fix closed two doors of six, and the four below hung on this
-        // exact fixture one command later: status and sync through the
-        // hash, the red-flag scan, the vendor copy, and a dev source's
-        // own SKILL.md.
+        // Every other reader that walks the same directory: status and
+        // sync through the hash, the red-flag scan, the vendor copy,
+        // and a dev source's own SKILL.md. Each one hangs on this
+        // fixture without a guard of its own.
         let (tx2, rx2) = std::sync::mpsc::channel();
         let dir2 = base.clone();
-        // The destination must sit OUTSIDE the tree being copied. A
-        // destination inside it made copy_tree recurse into its own
-        // output and fail on that, before it reached the pipe, so the
-        // copy assertion passed with the guard removed.
+        // The destination must sit outside the tree that is copied. A
+        // destination inside it makes copy_tree recurse into its own
+        // output and fail on that before it reaches the pipe, so the
+        // copy assertion passes even with the guard removed.
         let dst = std::env::temp_dir().join(format!("almanac-pipe-copy-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dst);
         std::thread::spawn(move || {
@@ -690,8 +689,8 @@ mod walker_tests {
         assert!(hash_refused, "the hash accepted a pipe as content");
         assert!(copy_refused, "the vendor copy accepted a pipe as content");
         // The scanner names the pipe, and still runs its path-only
-        // checks on it. A guard at the walk dropped both, so a pipe
-        // named payload.sh at a skill root scanned as clean.
+        // checks on it. A guard at the walk drops both, and a pipe
+        // named payload.sh at a skill root then scans as clean.
         assert!(
             flags
                 .iter()
