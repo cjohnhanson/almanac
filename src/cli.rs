@@ -15,7 +15,7 @@ pub const ABOUT: &str = "Almanac curates agent skills and indexes them for agent
 pub struct Args {
     /// Library directory. Literal: the directory must hold almanac.yml;
     /// no walk, no fallback. Without it, the nearest almanac.yml at or
-    /// above the cwd is used; with none, reads use the configured root
+    /// above the cwd is used. With none, reads use the configured root
     /// library and a write needs --home.
     #[arg(long, global = true)]
     pub root: Option<std::path::PathBuf>,
@@ -207,7 +207,7 @@ pub fn prime() -> String {
          {ABOUT}\n\
          A skill is a directory with a SKILL.md: frontmatter with a name and a one-line \
          description, then a body of instructions. A library is a directory with \
-         almanac.yml, found upward from the cwd or named by --root; with none, reads use \
+         almanac.yml, found upward from the cwd or named by --root. With none, reads use \
          the root library, writes need --home. Each entry is pinned to a commit and a \
          hash. stores.yml may declare other libraries; the nearer wins a name collision.\n\
          Commands:\n\
