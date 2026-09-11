@@ -37,9 +37,7 @@ struct SkillFrontmatter {
 ///
 /// The sources are in precedence order: the nearer source wins a name.
 /// A name that a later source also holds is dropped here, so the list
-/// shows what a command would actually load. `almanac check` reports
-/// the drop, because a skill that silently replaced another is the
-/// worst way to find out.
+/// shows what a command loads. `almanac check` reports every drop.
 #[must_use]
 pub fn index(project_dir: &Path, sources: &[SkillSource]) -> Vec<SkillEntry> {
     let mut entries: Vec<SkillEntry> = Vec::new();
@@ -123,9 +121,9 @@ fn show_reference(
     sources: &[SkillSource],
 ) -> Result<Option<String>, Error> {
     // A reference names one file inside the skill's references
-    // directory. A '..' check alone let an absolute path through, and
-    // join replaces on an absolute component, so the name decided
-    // which file was read.
+    // directory. A `..` check alone lets an absolute path through, and
+    // `join` replaces on an absolute component, so the name would
+    // decide which file is read.
     if !mdstore::is_plain_stem(ref_file) {
         return Ok(None);
     }
@@ -146,8 +144,8 @@ fn show_reference(
             // StoreDir::open resolves its root with ambient authority,
             // so a library that ships references as a symlink chooses
             // the root, and every name under it reads wherever the
-            // link points. A library shipping 'references -> /etc'
-            // served /etc/hosts through this function.
+            // link points. A library shipping `references -> /etc`
+            // serves /etc/hosts through this function.
             //
             // The link is refused here by type, before the handle
             // exists. Nothing below can undo that, because a name
@@ -176,12 +174,12 @@ fn show_reference(
 fn append_file_references(skill_name: &str, skill_dir: &Path, content: &mut String) {
     let refs_dir = skill_dir.join("references");
     // The same guard the read path uses. A listing that follows a link
-    // enumerates names out of wherever it points, and a listing is
-    // what reaches an agent's context. A library shipping
-    // 'references -> /etc' put 61 filenames there.
+    // enumerates names out of wherever it points, and the listing is
+    // what reaches an agent's context.
     //
-    // The listing must also agree with show. Advertising a file that
-    // show refuses tells an agent to run a command that fails.
+    // The listing must also agree with show. A file the listing
+    // advertises and show refuses tells an agent to run a command that
+    // fails.
     if !is_real_directory(&refs_dir) {
         return;
     }
@@ -216,7 +214,7 @@ pub fn format_index(entries: &[SkillEntry]) -> String {
     }
 
     let mut out = String::from(
-        "## Skills (almanac)\n\nAvailable skills — read the full SKILL.md when needed:\n\n",
+        "## Skills (almanac)\n\nAvailable skills. Read the full SKILL.md when you need one:\n\n",
     );
     out.push_str(&format_index_list(entries));
     out
@@ -687,9 +685,9 @@ mod tests {
         std::fs::write(dir.path().join("secret.md"), "SECRET").unwrap();
 
         // Each of these must be refused by a guard rather than by
-        // missing. '../../secret.md' from the references directory
-        // lands beside the skill, where nothing sits, so it asserted
-        // nothing; the planted file is one level further up.
+        // missing. `../../secret.md` from the references directory
+        // lands beside the skill, where nothing sits, so it asserts
+        // nothing. The planted file is one level further up.
         for name in [
             "../../../secret.md",
             "../SKILL.md",
@@ -732,9 +730,8 @@ mod tests {
 
     /// A handle confines the names used under a root. It does not
     /// choose the root. A library that ships references as a link
-    /// chose it, and every name under it read wherever the link
-    /// pointed: a library shipping 'references -> /etc' served
-    /// /etc/hosts through show.
+    /// chooses it, and every name under it then reads wherever the
+    /// link points.
     #[test]
     fn a_linked_references_directory_is_never_opened() {
         let dir = tempfile::tempdir().unwrap();
@@ -785,7 +782,7 @@ mod tests {
     }
 
     /// A SKILL.md that is a link points at a file the library does not
-    /// hold. Reverting the handle here broke no test.
+    /// hold. This test is the only cover for that.
     #[test]
     fn a_linked_skill_md_is_not_indexed() {
         let dir = tempfile::tempdir().unwrap();
@@ -812,8 +809,7 @@ mod tests {
 
     /// The listing reaches an agent's context, so a link there
     /// enumerates names out of wherever it points. A library shipping
-    /// 'references -> /etc' put 61 filenames into that context, in the
-    /// function seven lines below the read guard.
+    /// `references -> /etc` puts 61 filenames into that context.
     #[test]
     fn the_references_listing_does_not_enumerate_through_a_link() {
         let dir = tempfile::tempdir().unwrap();
