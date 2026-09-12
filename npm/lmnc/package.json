@@ -1,5 +1,5 @@
 {
-	"name": "lmnc",
+	"name": "@cjohnhanson/lmnc",
 	"description": "Almanac curates agent skills and indexes them for agents to read",
 	"bin": {
 		"lmnc": "bin/run.js",

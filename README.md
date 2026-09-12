@@ -9,14 +9,16 @@ first.
 
 ## Install
 
-The package is `lmnc`, because `almanac` was taken on every registry. The
-command is `almanac`, and both names install together.
+The package is `lmnc`, because `almanac` was taken on every registry. On
+npm it is `@cjohnhanson/lmnc`, because the registry refuses `lmnc` as too
+close to names it already holds. The command is `almanac`, and both
+names install together.
 
 ```sh
 cargo install --locked lmnc
 brew install cjohnhanson/tap/almanac
 uv tool install lmnc
-npm install -g lmnc
+npm install -g @cjohnhanson/lmnc
 ```
 
 `cargo install` builds from source. It needs Rust 1.88 and a C
@@ -33,7 +35,7 @@ Or run it without installing:
 
 ```sh
 uvx lmnc list
-npx lmnc list
+npx @cjohnhanson/lmnc list
 ```
 
 A release also carries prebuilt archives and a `.deb`, on the [releases
