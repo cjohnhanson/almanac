@@ -9,41 +9,50 @@ first.
 
 ## Install
 
-The package is `lmnc`, because `almanac` was taken on every registry. On
-npm it is `@cjohnhanson/lmnc`, because the registry refuses `lmnc` as too
-close to names it already holds. The command is `almanac`, and both
-names install together.
+The command is `almanac`, whichever package you install.
 
-```sh
-cargo install --locked lmnc
-brew install cjohnhanson/tap/almanac
-uv tool install lmnc
-npm install -g @cjohnhanson/lmnc
+**[Archives of precompiled binaries are available for macOS and
+Linux.](https://github.com/cjohnhanson/almanac/releases)** The Linux
+binaries are static executables. Each archive holds the binary, its man
+pages, the README and the licence. There is no Windows build.
+
+| Package manager | Package | Command |
+| --- | --- | --- |
+| [Homebrew](https://brew.sh) | [cjohnhanson/tap/almanac](https://github.com/cjohnhanson/homebrew-tap) | `brew install cjohnhanson/tap/almanac` |
+| [Cargo](https://doc.rust-lang.org/cargo/) | [lmnc](https://crates.io/crates/lmnc) | `cargo install --locked lmnc` |
+| [uv](https://docs.astral.sh/uv/) | [lmnc](https://pypi.org/project/lmnc/) | `uv tool install lmnc` |
+| [npm](https://www.npmjs.com) | [@cjohnhanson/lmnc](https://www.npmjs.com/package/@cjohnhanson/lmnc) | `npm install -g @cjohnhanson/lmnc` |
+
+On Debian or Ubuntu, download the `.deb` from the [releases
+page](https://github.com/cjohnhanson/almanac/releases) and install it:
+
+```
+wget https://github.com/cjohnhanson/almanac/releases/download/v0.2.5/lmnc_0.2.5-1_amd64.deb
+sudo dpkg -i lmnc_0.2.5-1_amd64.deb
 ```
 
-`cargo install` builds from source. It needs Rust 1.88 and a C
-compiler. The other three carry a prebuilt binary for macOS and Linux,
-x86-64 and arm64, published by a tagged release.
+To run it once without installing anything:
 
-To build the unreleased `main` branch:
-
-```sh
-cargo install --locked --git https://github.com/cjohnhanson/almanac
 ```
-
-Or run it without installing:
-
-```sh
 uvx lmnc list
 npx @cjohnhanson/lmnc list
 ```
 
-A release also carries prebuilt archives and a `.deb`, on the [releases
-page](https://github.com/cjohnhanson/almanac/releases). Each archive
-holds the binary and the man page. Install a `.deb` with `dpkg -i`: it
-is a file, not a repository, so `apt-get install` does not reach it.
+### Building
 
-Check the install with `almanac --version`.
+almanac is written in Rust, so you need a [Rust
+installation](https://www.rust-lang.org/) to compile it. almanac
+compiles with Rust 1.88 or newer. A C compiler is needed as well, which
+`aws-lc-sys` uses for its cryptography.
+
+To build almanac:
+
+```
+git clone https://github.com/cjohnhanson/almanac
+cd almanac
+cargo build --release
+./target/release/almanac --version
+```
 
 ## Usage
 
