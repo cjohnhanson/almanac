@@ -1,10 +1,10 @@
 <!-- metadata
-title: "Almanac CLI Reference"
+title: "Almanac CLI reference"
 description: "Complete command reference for the almanac skill aggregator"
 type: reference
 -->
 
-# Almanac CLI Reference
+# Almanac CLI reference
 
 ```
 almanac <command>
@@ -12,30 +12,33 @@ almanac <command>
 
 Almanac curates agent skills and indexes them for agents to read.
 
-## Global Options
+## Global options
 
-`--root <dir>` — Library directory, literal: the directory must hold
-`almanac.yml`; no walk, no fallback.
+`--root <dir>`: the library directory, taken literally. The directory
+must hold `almanac.yml`. No walk, and no fallback.
 
-`--home` — Act on the configured root library, wherever the command
+`--home`: act on the configured root library, wherever the command
 runs.
 
-`--version` — Print the version and exit.
+`--version`: print the version and exit.
 
-`--help` — Print the help and exit.
+`--help`: print the help and exit.
 
 ## Root resolution
 
-Without `--root`, a command finds its library by one rule, identical in
-tisket and zettel: the nearest `almanac.yml` at or above the working
-directory wins. The walk requires a regular file and stops at the first
-directory the invoking user does not own, so a marker planted in a
-shared ancestor captures nothing. With no library found, a read falls
-back to the root library set in `~/.config/almanac/config.yml` and says
-so on stderr; a write never falls back — it fails and names `--home`.
-No environment variable participates. The config path is fixed, and the
-home directory comes from the passwd database, not `$HOME`: both are
-repo-settable channels.
+Without `--root`, a command finds its library by one rule: the nearest
+`almanac.yml` at or above the working directory wins. The walk requires
+a regular file. It stops at the first directory the invoking user does
+not own, so a marker planted in a shared ancestor captures nothing.
+
+With no library found, a read falls back to the root library set in
+`~/.config/almanac/config.yml`, and it says so on stderr. A write never
+falls back. It fails and names `--home`.
+
+No environment variable takes part in the resolution. The config path
+is fixed, and the home directory comes from the passwd database rather
+than from `$HOME`. A repository can set either channel, and neither one
+decides where a command writes.
 
 A write prints its resolved target on stderr unless the target is the
 working directory's own library or `--root` named it. A read resolved by
@@ -200,9 +203,24 @@ Read the bundled almanac documentation.
 almanac docs                    List the available docs and their slugs
 almanac docs list               Same as bare `almanac docs`
 almanac docs <identifier>       Print one doc by slug, title, or unique prefix
-almanac docs search <query>     Search every doc
+almanac docs search <query>     List the docs that carry the query
+almanac docs --all              Print every doc, in one stream
 ```
 
+### `almanac serve`
+
+Serve this library over MCP. The server is read-only, and it has no
+authentication; `almanac docs composition` says what to put in front
+of it.
+
+```
+almanac serve [--surfaces <list>] [--bind <addr>]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--surfaces <list>` | `skills,tools` | The surfaces to offer, separated by commas: `skills`, `resources`, `tools`. |
+| `--bind <addr>` | (none) | Where to listen, for a client that connects over HTTP. Omitted, the server speaks on stdin and stdout for a client that starts it. |
 
 ## `almanac store list`
 
@@ -214,11 +232,13 @@ cache.
 ## `almanac store root`
 
 Show or set the root library that reads fall back to. `almanac store
-root` prints the current setting; `almanac store root <path>` writes it
-to `~/.config/almanac/config.yml` (the path must hold `almanac.yml`;
-changing an existing setting needs `--force`). Each tool reads its own
-file, so this one names the root store for almanac alone. One private repo
-can still serve all three, named once in each.
+root` prints the current setting. `almanac store root <path>` writes it
+to `~/.config/almanac/config.yml`. The path must hold `almanac.yml`,
+and a change to an existing setting needs `--force`.
+
+Each tool keeps its own config file, so this setting names the root
+library for almanac alone. One repository can hold `almanac.yml`,
+`tisket.yml`, and `zettel.yml`, and be the root for each of the three.
 
 ## `almanac store sync`
 

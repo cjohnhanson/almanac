@@ -1,10 +1,9 @@
 //! Manifest operations: init, add, sync, update, list, remove, index-md.
 //!
-//! The trust model, stated plainly: `add` trusts a source on first use.
-//! It shows the red-flag report and the staged tree, and nothing lands
-//! without `--accept`. Almanac then pins the content, and every later
-//! change arrives through an `update` that shows a diff first. No
-//! change lands without a report.
+//! `add` trusts a source on first use. It shows the red-flag report and
+//! the staged tree, and nothing lands without `--accept`. Almanac then
+//! pins the content, and every later change arrives through an `update`
+//! that shows a diff first.
 
 use std::path::{Path, PathBuf};
 
@@ -384,10 +383,10 @@ pub fn list(dir: &Path) -> Result<(), Error> {
             match hash_tree(&vendored) {
                 Ok(h) if h == entry.sha256 => "clean",
                 Ok(_) => "drifted",
-                // A tree the hash refuses has not drifted; it holds
-                // something that cannot be part of a skill. sync
-                // already says so, and status said drifted for a
-                // library that had not moved.
+                // A tree the hash refuses has not drifted. It holds
+                // something that cannot be part of a skill, and sync
+                // already says so. `drifted` here would name a library
+                // that has not moved.
                 Err(_) => "unreadable",
             }
         } else {
@@ -422,8 +421,8 @@ pub fn list(dir: &Path) -> Result<(), Error> {
 /// Markdown skills index for context injection, as a gaff prime section.
 ///
 /// The output degrades in steps under the byte budget: full lines while
-/// they fit, then name-only lines, then a truncation note. Almanac
-/// never cuts the list without a note.
+/// they fit, then name-only lines, then a truncation note. A cut list
+/// always carries that note.
 pub fn index_md(dir: &Path, max_bytes: usize) -> Result<String, Error> {
     let manifest = Manifest::load(dir)?;
     let library = manifest.library_dir(dir)?;

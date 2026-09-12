@@ -1,14 +1,13 @@
 //! Fetches sources and vendors skill trees into the library.
 //!
-//! Every git operation runs in-process on gix; no git program is
-//! spawned. To fetch a pinned commit from a network source it tries a
-//! depth-1 fetch of the sha, which GitHub permits. It then tries a fetch
-//! of the recorded ref. It then tries a full fetch. It reports the path
-//! that worked. A local repository is read in place, at the rev, with no
-//! fetch at all. A copy honors the hash deny-list
-//! and refuses a symlink that points outside the tree. It writes an
-//! `.almanac-origin` stamp into the vendored directory, so the managed
-//! set is explicit.
+//! Every git operation runs in-process on gix, and no git program is
+//! spawned. To fetch a pinned commit from a network source, almanac
+//! tries a depth-1 fetch of the sha, which GitHub permits, then a fetch
+//! of the recorded ref, then a full fetch. It reports the path that
+//! worked. A local repository is read in place, at the rev, with no
+//! fetch at all. A copy honors the hash deny-list and refuses a symlink
+//! that points outside the tree. It writes an `.almanac-origin` stamp
+//! into the vendored directory, so the managed set is explicit.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
@@ -96,7 +95,12 @@ fn reach(url: &str) -> Result<Reach, VendorError> {
         gix::url::Scheme::Ssh => Err(VendorError::Git(format!(
             "{url}: an ssh transport needs an ssh process, and almanac spawns none; use https"
         ))),
-        gix::url::Scheme::Ext(s) => Err(VendorError::Git(format!("{url}: unsupported scheme {s}"))),
+        // gix 0.87 made Ext a unit variant and added two helper forms.
+        // None of the three names a transport almanac can use, and Ext
+        // no longer carries the scheme text, so the url reports it.
+        gix::url::Scheme::Ext | gix::url::Scheme::Helper(_) | gix::url::Scheme::HelperUrl(_) => {
+            Err(VendorError::Git(format!("{url}: unsupported scheme")))
+        }
     }
 }
 
@@ -393,8 +397,8 @@ pub fn vendor(skill_src: &Path, library: &Path, entry: &Entry) -> Result<String,
     // This function removes a directory and writes in its place, and
     // the name it uses came from a published SKILL.md or from an
     // almanac.yml that a poisoned add already wrote. Check it here as
-    // well as at the point of entry: a guard on one route is a guard
-    // the other route does not have.
+    // well as at the point of entry, because a guard on one route
+    // leaves the other route open.
     if !mdstore::is_plain_stem(&entry.name) {
         return Err(VendorError::Io(format!(
             "`{}` is not a plain skill name; a name may not hold a path separator",

@@ -1,13 +1,14 @@
 <!-- metadata
 title: Composed libraries
 description: Declaring other libraries, name precedence, and skill requirements.
+type: explanation
 -->
 
 # Composed libraries
 
-One library rarely holds every skill. A personal library holds the
-skills you wrote. A team library holds the skills the team shares. An
-upstream library holds the skills that somebody else maintains.
+One library rarely holds every skill. Your own library holds what you
+wrote, a team library holds what the team shares, and an upstream
+library holds what somebody else maintains.
 
 A library declares the other libraries that it draws on. The
 declarations live in `stores.yml`, beside `almanac.yml`:
@@ -111,14 +112,15 @@ makes `resources` and `tools` server capabilities: the server offers
 them, and a client that cannot use one never calls it. So the choice is
 configuration.
 
-- `skills` — the skills extension, `skills/list` and `skills/get`. The
+- `skills`: the skills extension, `skills/list` and `skills/get`. The
   server returns each skill's frontmatter as written and a digest for
-  each of its files, which is what the extension asks a host to verify.
+  each of its files. That digest is what the extension asks a host to
+  verify.
   Almanac already pins content by SHA-256, so the digests are the same
   ones the manifest uses.
-- `resources` — one readable resource for each file, at
+- `resources`: one readable resource for each file, at
   `skill://<name>/SKILL.md` and `skill://<name>/references/<file>`.
-- `tools` — `almanac_list_skills`, `almanac_get_skill`, and
+- `tools`: `almanac_list_skills`, `almanac_get_skill`, and
   `almanac_check`. Every client can call a tool, so this surface is the
   floor that a served library can rely on.
 
@@ -132,10 +134,9 @@ request.
 A served library has none. The server answers whoever opens the
 connection.
 
-This is deliberate. Authentication belongs in front of the server, in
-something built for it: a reverse proxy that terminates TLS and checks
-a token or an identity provider. Three tools each carrying their own
-half-implementation would be three places to get it wrong.
+Authentication belongs in front of the server, in a program built for
+it. A reverse proxy terminates TLS and checks a token or an identity
+provider.
 
 Bind to `127.0.0.1` for a client on this machine. To serve anybody
 else, put the server behind a proxy that authenticates, and let the
@@ -143,8 +144,8 @@ proxy decide who reaches it.
 
 ### What a served library allows
 
-A served library is read-only, and there is no flag that changes it.
-Almanac's writes are curation. `add` fetches a skill and prints its
-red-flag report; `accept` vendors it and pins the content. Both decide
-what the library vouches for, and that decision is a person's at the
-command line. A remote caller reads what the library already holds.
+A served library is read-only, and no flag changes that. The commands
+that write are the curation commands. `add` fetches a skill and prints
+its red-flag report, and `--accept` vendors it and pins the content.
+That decision belongs to a person at the command line. A remote caller
+reads what the library already holds.

@@ -1,13 +1,15 @@
 <!-- metadata
 title: Curation and pinning
-description: The manifest workflow: add, sync, update, drift, and the trust model.
+description: "The manifest workflow: add, sync, update, drift, and the trust model."
+type: explanation
 -->
 
 # Curation and pinning
 
-Almanac makes a library of agent skills reproducible. A manifest pins
-every skill to a commit and a content hash. Updates pass through a diff
-and a scan. Drift is visible. This page describes that workflow.
+A manifest pins every skill in the library to a commit and a content
+hash, so the library rebuilds the same way on another machine. An
+update passes through a diff and a scan before it re-pins, and
+`sync --check` reports an entry that no longer matches its pin.
 
 ## The manifest
 
@@ -35,8 +37,8 @@ payloads, invisible unicode, base64 blobs, pipe-to-shell commands, and
 NUL bytes. Nothing lands without `--accept`.
 
 Almanac then pins the content. `update` shows the upstream diff and a
-fresh scan, and it re-pins only with `--yes`. No change lands without a
-report.
+fresh scan, and it re-pins only with `--yes`. Every command that
+changes the library prints a report first.
 
 The manifest binds the content against upstream drift and accident. It
 does not protect against a compromised library repo, because the
@@ -44,10 +46,10 @@ manifest and the content live in the same repo.
 
 ## Sources
 
-- `github:owner/repo` (or bare `owner/repo`) — pinned by commit and hash
-- `git:<url>` — any https, git://, or local git URL, pinned the same
-  way. ssh is refused; almanac spawns no ssh process.
-- `dev:<path>` — a local snapshot of a skill you develop alongside.
+- `github:owner/repo` (or bare `owner/repo`): pinned by commit and hash.
+- `git:<url>`: any https, git://, or local git URL, pinned the same
+  way. ssh is refused, because almanac spawns no ssh process.
+- `dev:<path>`: a local snapshot of a skill you develop alongside.
   `sync --check` skips it and reports drift as information.
 
 To fetch a pinned commit, almanac tries a direct sha fetch, then the
@@ -62,14 +64,16 @@ permits.
 
 ## Context for an agent
 
-Two commands emit text meant for an agent's context. Neither decides
-when it is read; that is the caller's policy.
+`almanac prime` and `almanac index --md` both emit text meant for an
+agent's context. Neither one decides when it is read. That is the
+caller's policy.
 
     almanac prime
 
-What almanac is, its model, and the commands an agent reaches for. A
-pure function of the binary, under 700 bytes: put it wherever your host
-primes a session, and it stays exact until almanac is upgraded.
+What almanac is, its model, and the commands an agent reaches for. The
+output depends only on the binary version and stays under 700 bytes.
+Put it wherever your host primes a session, and it stays exact until
+almanac is upgraded.
 
     almanac index --md --max-bytes 4096
 
