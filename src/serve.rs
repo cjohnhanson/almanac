@@ -7,12 +7,12 @@
 //! A server offers one or more surfaces, because a client cannot be
 //! asked which it understands:
 //!
-//! - **skills** — the skills extension (`skills/list`, `skills/get`).
-//!   The richest surface, and the newest, so the fewest clients
-//!   implement it. Almanac fits it closely: it already pins content by
+//! - `skills`: the skills extension (`skills/list`, `skills/get`). It
+//!   is the newest of the three, so the fewest clients implement it.
+//!   Almanac fits it closely, because it already pins content by
 //!   SHA-256, which is what the extension asks a host to verify.
-//! - **resources** — one readable resource for each file of each skill.
-//! - **tools** — `almanac_list_skills`, `almanac_get_skill`,
+//! - `resources`: one readable resource for each file of each skill.
+//! - `tools`: `almanac_list_skills`, `almanac_get_skill`, and
 //!   `almanac_check`. Every client can call a tool, so this is the
 //!   floor that a served library can rely on.
 
@@ -106,15 +106,12 @@ impl AlmanacServer {
         })
     }
 
-    /// The text of one file named by a `skill://` URI.
-    /// Run a closure that touches the filesystem off the async
-    /// workers.
+    /// Run a closure that touches the filesystem off the async workers.
     ///
     /// Every surface here reads files, and a git-backed library reads
     /// git objects. On the async pool that work blocks the runtime, so
-    /// one slow call delays every other client. `call_tool` got this
-    /// treatment; resources and the skills extension did not, and they
-    /// read exactly the same things.
+    /// one slow call delays every other client. Each surface that
+    /// reads goes through this function.
     async fn blocking<T, F>(&self, work: F) -> Result<T, McpError>
     where
         T: Send + 'static,
@@ -200,11 +197,11 @@ impl AlmanacServer {
                 Ok(serde_json::to_string_pretty(&listed).unwrap_or_default())
             }
             "almanac_get_skill" => {
-                // The shared accessors separate three answers: absent,
-                // a string, and the wrong type. Reading an argument
-                // with as_str alone turned a mistyped `file` into a
-                // request for the SKILL.md, which is a different
-                // document reported as success.
+                // The shared accessors separate an absent argument, a
+                // string, and a value of the wrong type. `as_str`
+                // alone folds the last two together, and a mistyped
+                // `file` then reads the SKILL.md instead, which is a
+                // different document returned as success.
                 let skill = mdstore::mcp::required_str(args, name, "name")
                     .map_err(|e| Error::General(e.to_string()))?;
                 let file = mdstore::mcp::optional_str(args, "file")
@@ -260,6 +257,12 @@ fn to_mcp_error(e: &Error) -> McpError {
     McpError::internal_error(e.to_string(), None)
 }
 
+// The trait declares these methods async, so the signatures are not ours
+// to change. A method that never awaits still has to match the trait, and
+// clippy reads the `async` as stray. The allow sits on the impl because
+// the trait is macro-generated and an attribute on one method does not
+// survive the expansion.
+#[allow(clippy::unused_async_trait_impl)]
 impl ServerHandler for AlmanacServer {
     fn get_info(&self) -> InitializeResult {
         let mut capabilities = ServerCapabilities::default();

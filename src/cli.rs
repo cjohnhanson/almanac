@@ -2,7 +2,6 @@ use std::path::Path;
 
 use clap::Parser;
 
-use crate::docs;
 use crate::error::Error;
 use crate::skill;
 use crate::source::SkillSource;
@@ -16,7 +15,7 @@ pub const ABOUT: &str = "Almanac curates agent skills and indexes them for agent
 pub struct Args {
     /// Library directory. Literal: the directory must hold almanac.yml;
     /// no walk, no fallback. Without it, the nearest almanac.yml at or
-    /// above the cwd is used; with none, reads use the configured root
+    /// above the cwd is used. With none, reads use the configured root
     /// library and a write needs --home.
     #[arg(long, global = true)]
     pub root: Option<std::path::PathBuf>,
@@ -44,11 +43,11 @@ const fn intent(command: &Command) -> Option<mdstore::resolve::Intent> {
     use mdstore::resolve::Intent::{Read, Write};
     Some(match command {
         // Rootless: these never resolve a store. Init acts on its
-        // literal root, as it always has.
+        // literal root.
         Command::GenMan { .. }
         | Command::GenCompletions { .. }
         | Command::Prime
-        | Command::Docs { .. }
+        | Command::Docs(_)
         | Command::Init { .. }
         | Command::Store(StoreCommand::Root(_)) => return None,
         // With explicit --source directories, listing needs no library
@@ -186,13 +185,14 @@ pub enum Command {
     /// Print what almanac is and how to use it, for an agent's context.
     Prime,
     /// Browse bundled documentation.
-    Docs {
-        /// Topic slug to print, or "search" to search.
-        topic: Option<String>,
-        /// Search query. Used when the topic is "search".
-        query: Option<String>,
-    },
+    Docs(diataxis::DocsArgs),
 }
+
+/// This tool's own documentation, compiled in.
+///
+/// The build script embedded every page in `docs/`, so nothing here
+/// lists them and `almanac docs` works from any directory.
+static DOCS: &[(&str, &str)] = diataxis::embedded_docs!();
 
 /// The prime: what almanac is, for an agent's context.
 ///
@@ -207,7 +207,7 @@ pub fn prime() -> String {
          {ABOUT}\n\
          A skill is a directory with a SKILL.md: frontmatter with a name and a one-line \
          description, then a body of instructions. A library is a directory with \
-         almanac.yml, found upward from the cwd or named by --root; with none, reads use \
+         almanac.yml, found upward from the cwd or named by --root. With none, reads use \
          the root library, writes need --home. Each entry is pinned to a commit and a \
          hash. stores.yml may declare other libraries; the nearer wins a name collision.\n\
          Commands:\n\
@@ -263,9 +263,8 @@ pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Re
             max_bytes,
         } => {
             // This payload is what an agent reads before it asks for
-            // anything. It once covered only the manifest's own
-            // library, so every declared library was missing from the
-            // one listing the agent sees.
+            // anything, so it covers every reachable library and not
+            // only the one the manifest names.
             let all_sources = merge_sources(sources, &extra_sources);
             if md {
                 let entries = reachable_skills(root, &all_sources);
@@ -279,7 +278,7 @@ pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Re
             print!("{}", prime());
             Ok(())
         }
-        Command::Docs { topic, query } => cmd_docs(topic.as_deref(), query.as_deref()),
+        Command::Docs(args) => cmd_docs(&args),
         Command::Init { library } => crate::ops::init(root, &library),
         Command::Add {
             source,
@@ -381,9 +380,10 @@ fn cmd_check(root: &Path) -> Result<(), Error> {
 
 /// Serve this library over MCP.
 ///
-/// A served library is always read-only. Almanac's writes are curation:
-/// `add` and `accept` decide what the library vouches for, and that
-/// decision is a person's. No access mode makes them callable.
+/// A served library is always read-only. The commands that write are
+/// the curation commands: `add` and its `--accept` flag decide what the
+/// library vouches for, and a person makes that decision at the command
+/// line. No access mode makes them callable over MCP.
 fn cmd_serve(root: &Path, surfaces: &str, bind: Option<&str>) -> Result<(), Error> {
     let surfaces =
         mdstore::mcp::Surfaces::parse_list(surfaces).map_err(|e| Error::General(e.to_string()))?;
@@ -426,7 +426,7 @@ pub fn run(args: Args) -> Result<(), Error> {
             return run_store_root(&a, args.user_config.as_deref());
         }
         // A rootless command acts on the literal --root when one is
-        // given (as `almanac --root dir init` always has), else the cwd.
+        // given, and on the working directory when none is.
         let cwd = std::env::current_dir().map_err(|e| Error::General(e.to_string()))?;
         let root = match &args.root {
             Some(r) if r.is_relative() => cwd.join(r),
@@ -447,9 +447,9 @@ pub fn run(args: Args) -> Result<(), Error> {
     )
     .map_err(|e| Error::General(e.to_string()))?;
     announce(&resolved.root, &cwd, resolved.via, intent);
-    // The curated library is a source, computed from the RESOLVED root:
-    // computed from the literal argument, a walked or fallback run
-    // would list nothing, silently.
+    // The curated library is a source, and it comes from the resolved
+    // root. Taken from the literal argument instead, a walked or
+    // fallback run would list nothing and say nothing.
     let root = resolved.root;
     run_command(&root, &manifest_sources(&root), args.command)
 }
@@ -604,8 +604,7 @@ fn manifest_sources(root: &Path) -> Vec<SkillSource> {
 /// A skill with a directory on this machine goes through the directory
 /// path, which appends the references listing and reads one reference
 /// file by name. A library that lives in git has no directory to scan,
-/// and was invisible here while the MCP server served it in full, so
-/// the workspace reads it the way the server does.
+/// so the workspace reads it the way the MCP server does.
 fn cmd_show(root: &Path, name: &str, sources: &[SkillSource]) -> Result<(), Error> {
     if skill::show(name, root, sources)? {
         return Ok(());
@@ -655,9 +654,9 @@ fn cmd_index(root: &Path, sources: &[SkillSource]) {
 ///
 /// The workspace answers first, because it reads a library wherever it
 /// lives: a directory on this machine, or a git tree in the cache. A
-/// directory scan sees only the first kind, and a git-declared library
-/// was then invisible to `list`, `show` and `index` while the MCP
-/// server served it in full. The curator must see what the agent sees.
+/// directory scan sees only the first kind, so `list`, `show` and
+/// `index` would miss a git-declared library that the MCP server
+/// serves in full. The curator must see what the agent sees.
 ///
 /// Extra `--source` directories a host passes follow, and lose a name
 /// the workspace already holds.
@@ -680,36 +679,19 @@ fn reachable_skills(root: &Path, sources: &[SkillSource]) -> Vec<skill::SkillEnt
     entries
 }
 
-fn cmd_docs(topic: Option<&str>, query: Option<&str>) -> Result<(), Error> {
-    match topic {
-        None | Some("list") => {
-            print!("{}", docs::format_list(docs::PAGES));
+fn cmd_docs(args: &diataxis::DocsArgs) -> Result<(), Error> {
+    let set = diataxis::DocSet::from_embedded(DOCS).map_err(|e| Error::General(e.to_string()))?;
+    let request = args.request().map_err(|e| Error::General(e.to_string()))?;
+    match set.render(request) {
+        Ok(text) => {
+            print!("{text}");
             Ok(())
         }
-        Some("search") => {
-            let q = query.unwrap_or("");
-            if q.is_empty() {
-                return Err(Error::General(
-                    "usage: almanac docs search <query>".to_string(),
-                ));
-            }
-            let matches = docs::find_matching(docs::PAGES, q);
-            if matches.is_empty() {
-                eprintln!("no docs matching '{q}'");
-            } else {
-                print!("{}", docs::format_list_from_refs(&matches));
-            }
-            Ok(())
-        }
-        Some(identifier) => {
-            if let Some(page) = docs::find(identifier) {
-                print!("{}", page.content());
-                return Ok(());
-            }
-            eprintln!("unknown doc: {identifier}");
+        Err(e) => {
+            eprintln!("{e}");
             eprintln!();
-            print!("{}", docs::format_list(docs::PAGES));
-            Err(Error::General(format!("doc '{identifier}' not found")))
+            print!("{}", set.listing());
+            Err(Error::General(e.to_string()))
         }
     }
 }
