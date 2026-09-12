@@ -2,7 +2,7 @@
 # The registry name, because `almanac` is taken on crates.io, PyPI and
 # npm alike. The binary keeps the typed name; see [[bin]] below.
 name = "lmnc"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 # 1.88, read from the graph rather than from the edition. Edition 2024
 # needs 1.85, and 1.85 covers the edition and not this crate: the crate

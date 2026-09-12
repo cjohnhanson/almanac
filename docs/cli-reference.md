@@ -242,8 +242,9 @@ library for almanac alone. One repository can hold `almanac.yml`,
 
 ## `almanac store sync`
 
-Fetch each declared remote library into the local cache. This is the
-only command that reaches the network.
+Fetch each declared remote library into the local cache. This command
+reaches the network, as `add`, `update` and `sync` also do. No other
+command does.
 
 ## `almanac check`
 

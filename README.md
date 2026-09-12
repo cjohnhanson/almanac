@@ -12,21 +12,21 @@ first.
 The package is `lmnc`, because `almanac` was taken on every registry. The
 command is `almanac`, and both names install together.
 
-Not released yet. Until the first tag, build from source:
-
-```sh
-cargo install --locked --git https://github.com/cjohnhanson/almanac
-```
-
-Requires Rust 1.88 and a C compiler. macOS and Linux, x86-64 and arm64.
-
-From the first release onward:
-
 ```sh
 cargo install --locked lmnc
 brew install cjohnhanson/tap/almanac
 uv tool install lmnc
 npm install -g lmnc
+```
+
+`cargo install` builds from source. It needs Rust 1.88 and a C
+compiler. The other three carry a prebuilt binary for macOS and Linux,
+x86-64 and arm64, published by a tagged release.
+
+To build the unreleased `main` branch:
+
+```sh
+cargo install --locked --git https://github.com/cjohnhanson/almanac
 ```
 
 Or run it without installing:
@@ -127,8 +127,10 @@ check` reports an entry that names no skill, and an entry that uses an
 alias the library does not declare.
 
 `almanac store list` shows the libraries and their skill counts.
-`almanac store sync` fetches the remote ones into a local cache; it is
-the only command that reaches the network.
+`almanac store sync` fetches the remote ones into a local cache. Four
+commands reach the network: `add`, `update`, `sync`, and `store sync`.
+Every other command reads what is already vendored or cached, so an
+answer never changes because of a fetch nobody asked for.
 
 ## Serving a library
 

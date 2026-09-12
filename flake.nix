@@ -66,8 +66,13 @@
           };
 
           commonArgs = {
+            # pname stays a literal, because the crate is `lmnc` and the
+            # command is `almanac`. The version is read from the manifest
+            # rather than repeated: pyproject.toml declares it dynamic
+            # and npm/generate.mjs greps it, so this was the one place a
+            # release had to edit by hand, and no gate reads this file.
             pname = "almanac";
-            version = "0.2.0";
+            version = (craneLib.crateNameFromCargoToml { cargoToml = ./Cargo.toml; }).version;
             inherit src;
             strictDeps = true;
             buildInputs = pkgs.lib.optionals pkgs.stdenv.isDarwin [
@@ -101,7 +106,10 @@
               # builds PATH from the declared inputs, so both have to be
               # named here. A runner has them already, which is why the
               # gate stays green while the package cannot build.
-              nativeCheckInputs = [ pkgs.gitMinimal pkgs.jq ];
+              nativeCheckInputs = [
+                pkgs.gitMinimal
+                pkgs.jq
+              ];
               checkPhase = ''
                 tmpHome="$(mktemp -d)"
                 export HOME="$tmpHome"
