@@ -72,9 +72,14 @@ uses an alias that the library does not declare.
 ## Remote libraries
 
 `almanac store sync` fetches each declared remote library into a local
-cache. It is the only command that reaches the network. Every other
-command reads what the cache holds, so an answer never changes because
-of a fetch that nobody asked for.
+cache. Four commands reach the network: `add` and `update` fetch a
+pinned commit for one entry, `sync` refetches an entry that is missing
+or drifted, and `store sync` fills the cache for a declared library.
+Every other command reads what is already vendored or cached, so an
+answer never changes because of a fetch nobody asked for.
+
+That matters where egress is controlled. Those four commands are the
+ones to allow or to refuse.
 
 A git library keeps one bare clone for each URL, and its skills are
 read at the revision that the declaration names. Two libraries that
