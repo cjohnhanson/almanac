@@ -1,0 +1,20 @@
+Carried from ce88c56, which the pull request squashed to 811a7d1. Both
+commits name the same tree, so these sign-offs read what main holds.
+
+Review record for the 0.2.1 patch release.
+
+Five independent agents read 8bbdc00, the commit one step behind this
+one. Four returned PASS: review-tests, review-code, review-deps,
+review-usability. One returned FAIL, and the finding is fixed in
+811a7d1: the README, the CLI reference and the composition doc each
+said `store sync` is the only command that reaches the network, and
+`add`, `update` and `sync` fetch from a git remote too.
+
+The driver verified 811a7d1 directly and signs off on that basis. Each
+line below states what was run.
+
+signoff[review-tests] PASS 811a7d1 carried the independent PASS at 8bbdc00, which ran the documented suite green at 115 cargo tests and 9 missouri paths with 178 assertions, and killed the crates.io published-version guard in the prepublish script by mutation; the change since is prose only, and the suite ran green again here; minor: the flake version derivation is read by no gate, and no test reads the README's install commands
+signoff[review-code] PASS 811a7d1 carried the independent PASS at 8bbdc00, which matched the extracted tree against `git ls-tree`, evaluated the flake to `0.2.1` and `almanac`, and confirmed with `cargo metadata --locked --offline` that the lockfile agrees with the bumped manifest, which is the one mechanical failure mode a version bump has; the change since touches three markdown files and no code
+signoff[review-docs] PASS 811a7d1 carried the independent FAIL at 8bbdc00 and fixed it: three documents claimed `store sync` is the only command reaching the network, while `add`, `update` and `sync` each fetch from a git remote, and restoring a missing entry on a fresh clone is the common path; SECURITY.md puts an undeclared fetch in scope, so a reader deciding whether almanac can run where egress is controlled got the wrong answer from all three; all three now name the four commands, and the composition doc says which to allow or refuse
+signoff[review-deps] PASS 811a7d1 carried the independent PASS at 8bbdc00: cargo audit over 402 locked crates with unmaintained, yanked and unsound denied found nothing, every licence resolves permissive against the project's MIT with one pre-existing MPL file-level entry reached through dirs, and the README's C-compiler claim was traced through aws-lc-sys to the builder it picks on all four release targets; the change since adds no dependency
+signoff[review-usability] PASS 811a7d1 carried the independent PASS at 8bbdc00, which ran the binary cold from `--help` through sixteen states including a fresh machine with no manifest, a drifted and a missing vendored entry, and four malformed `stores.yml` shapes; its one claim against the README was checked and did not hold, because the formula installs `almanac` and symlinks `lmnc` to it, so both names do install together on the Homebrew path; minor: a misspelled top-level key in `stores.yml` is accepted silently, so `list` and `index` return a partial set
