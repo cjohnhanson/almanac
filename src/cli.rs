@@ -240,8 +240,8 @@ pub enum Command {
     /// <name>/references/<file>` prints one reference file. Exits 1 when
     /// the skill is not found.
     ///
-    /// show reads the library directories on this machine first (this
-    /// library, each path: library, and each --source directory) and a
+    /// show first reads the directories on this machine: this library,
+    /// each path: library, and each --source directory. It reads a
     /// library declared with git: after them. When a git: library wins a
     /// name that one of those directories also holds, show prints the
     /// directory's copy. list and index give the git: library's copy.

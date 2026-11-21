@@ -53,9 +53,9 @@ library follows, in the order that `stores.yml` lists them. A library
 that a declared library declares comes after that one.
 
 `list` and `index` give the winner, so the list shows what an agent
-loads. `show` reads the library directories on this machine first
-(this library, each `path:` library, and each `--source` directory)
-and a `git:` library after them. When a `git:` library wins a name that
+loads. `show` first reads the directories on this machine: this
+library, each `path:` library, and each `--source` directory. It reads
+a `git:` library after them. So when a `git:` library wins a name that
 one of those directories also holds, `show` prints the directory's
 copy, and `list` and `index` give the `git:` library's copy.
 
@@ -86,9 +86,9 @@ A skill that loses a name is still on disk. `list` and `index` leave it
 out, and `show` prints the winner instead, except in the `git:` case
 above. That is a surprise if you do not know it happened.
 
-`almanac check` reports each name that this library and the libraries
-it declares both hold: the library that wins it, and each library that
-also holds it. It does not read `--source` directories. Run the command
+`almanac check` reports every shadowed name, the library that won it,
+and each library that also holds it. It does not read `--source`
+directories. Run the command
 when a skill does not behave the way its file reads.
 
 ## Requirements
