@@ -8,6 +8,19 @@ assertions:
     command: "cd work/src && almanac --user-config ../../cfg.yml list 2>err.txt >out.txt && grep -q 'reading root library' err.txt && grep -q 'root-skill' out.txt && rm err.txt out.txt"
   - name: "show reads the fallback library too"
     command: "cd work/src && almanac --user-config ../../cfg.yml show root-skill 2>/dev/null | grep -q 'Root Skill'"
+  # An index built with --home is read in a repository that may hold
+  # its own almanac.yml. A plain `almanac show` there resolves that
+  # library and misses the skill, so the hint carries --home.
+  - name: "index --md with --home hints show --home, and the hint loads the skill"
+    command: |
+      mkdir -p own && (cd own && almanac init >/dev/null) &&
+      cd own &&
+      almanac --user-config ../cfg.yml --home index --md 2>/dev/null | head -1 | grep -qF 'Available skills (show with `almanac show --home <name>`):' &&
+      almanac --user-config ../cfg.yml show --home root-skill 2>/dev/null | grep -q 'Root Skill' &&
+      ! almanac --user-config ../cfg.yml show root-skill >/dev/null 2>&1 &&
+      cd .. && rm -rf own
+  - name: "index --md without --home keeps the plain hint"
+    command: "cd work/src && almanac --user-config ../../cfg.yml index --md 2>/dev/null | head -1 | grep -qF 'Available skills (show with `almanac show <name>`):'"
   - name: "a write from a libraryless cwd refuses and names --home"
     command: "cd work/src && ! almanac --user-config ../../cfg.yml sync >/dev/null 2>&1 && almanac --user-config ../../cfg.yml sync 2>&1 | grep -q -- '--home'"
   - name: "with no config the read fails naming both facts"

@@ -927,9 +927,11 @@ mod tests {
         .unwrap();
         std::fs::write(skill.join("DREAM.md"), "# Dream\n").unwrap();
         std::fs::write(skill.join("scripts/go.sh"), "#!/bin/sh\n").unwrap();
-        // A relative source, so the printed path must be made absolute.
+        // A relative source with a `..` in it, so the printed path must
+        // be made absolute and normalized on every platform.
+        std::fs::create_dir_all(dir.path().join("sub")).unwrap();
         let sources = vec![SkillSource::Path {
-            path: "./skills/".into(),
+            path: "./sub/../skills/".into(),
         }];
 
         let out = show_to_string("my-skill", dir.path(), &sources);

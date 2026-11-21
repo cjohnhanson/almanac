@@ -161,8 +161,8 @@ impl AlmanacServer {
             ),
             Tool::new(
                 "almanac_get_skill",
-                "Return the full text of one skill, by name, after a line that names the \
-                 skill's directory. Optionally a file beside it, such as \
+                "Return the SKILL.md text of one skill, by name, after a line that names \
+                 the skill's directory. Optionally a file beside it, such as \
                  references/deep-dive.md.",
                 Arc::new(schema_with(&[
                     ("name", "The skill name.", true),
@@ -686,6 +686,9 @@ mod tests {
 
         let resource = s.read_uri("skill://writing/SKILL.md").unwrap();
         assert!(resource.starts_with("---\n"), "{resource}");
+        // The directory line, a blank line, the SKILL.md, and nothing
+        // else: no references listing, though the fixture has one.
+        assert_eq!(text, format!("{first}\n\n{resource}"));
 
         args.insert("file".into(), json!("references/deep-dive.md"));
         let sub = s.call("almanac_get_skill", &args).unwrap();

@@ -464,14 +464,9 @@ impl Workspace {
     /// Files beside a skill's SKILL.md that could not be read.
     #[must_use]
     pub fn skill_file_problems(&self, view: &View<'_>) -> Vec<String> {
-        let member = &self.snapshot.graph.members[view.id.member];
-        let Some(mdstore::StoreContent::Dir(root)) = member.content.as_ref() else {
+        let Some(skill_dir) = self.skill_dir(view) else {
             return Vec::new();
         };
-        let Some(parent) = std::path::Path::new(&view.skill.rel_path).parent() else {
-            return Vec::new();
-        };
-        let skill_dir = root.root().join(parent);
         let mut problems = Vec::new();
         collect_problems(&skill_dir, &skill_dir, &mut problems);
         problems.sort();

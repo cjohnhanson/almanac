@@ -154,7 +154,7 @@ curated library is the main source. Read `almanac docs curation`.
 
 ### `almanac show <name>`
 
-Print the full SKILL.md content of one skill.
+Print the directory and the full SKILL.md content of one skill.
 
 ```
 almanac show <name> [--source <path>]
@@ -166,7 +166,7 @@ almanac show <name> [--source <path>]
 | `--source <path>` | `-s` | Skill source directory. Repeatable |
 
 The first line names the absolute directory that holds the SKILL.md.
-A blank line follows, then the raw SKILL.md content. A relative path in
+A blank line follows, then the SKILL.md content. A relative path in
 the skill body, such as a sibling file or a script under `scripts/`,
 resolves against that directory:
 
@@ -180,11 +180,14 @@ description: How to write.
 ```
 
 A skill from a library that lives in git has no directory on this
-machine, and prints without the first line. `almanac show
-<name>/references/<file>` prints the reference file alone. The
-`almanac_get_skill` tool of `almanac serve` returns the same text as
-`almanac show`. Almanac exits with an error when the skill is not
-found.
+machine, and prints without the first line. A skill found through
+`--source` that has a `references/` directory ends with a
+`## References` section, one `almanac show` command for each file.
+`almanac show <name>/references/<file>` prints the reference file
+alone. The `almanac_get_skill` tool of `almanac serve` returns the
+directory line and the SKILL.md content, with no references section;
+its `file` argument reads a reference. Almanac exits with an error when
+the skill is not found.
 
 ### `almanac index`
 
@@ -205,6 +208,12 @@ The JSON output is an array of skill objects. Each object holds `name`,
 
 Under the `--md` budget the output degrades in steps: full lines first,
 then names only, then a truncation note.
+
+The `--md` header names the command that loads a skill:
+`almanac show <name>`. Under `--home` it names
+`almanac show --home <name>`, because the agent that reads the index
+can work in a repository with its own `almanac.yml`, where a plain
+`almanac show` reads that library instead.
 
 ### `almanac prime`
 

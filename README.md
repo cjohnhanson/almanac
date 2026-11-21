@@ -58,7 +58,7 @@ cargo build --release
 
 ```sh
 almanac list                  # every skill, with descriptions
-almanac show <name>           # the full SKILL.md content
+almanac show <name>           # the skill directory, then the SKILL.md
 almanac index                 # a JSON index for machines
 almanac docs [topic]          # the bundled documentation
 ```
