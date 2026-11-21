@@ -695,6 +695,17 @@ mod tests {
         assert!(sub.starts_with("# Deep dive"), "{sub}");
     }
 
+    /// A name that resolves to no skill is an error that names it,
+    /// never an empty success an agent would read as a blank skill.
+    #[test]
+    fn get_skill_refuses_an_unknown_name() {
+        let s = server(Surfaces::tools_only());
+        let mut args = Map::new();
+        args.insert("name".into(), json!("nosuch"));
+        let err = s.call("almanac_get_skill", &args).unwrap_err();
+        assert!(err.to_string().contains("nosuch"), "{err}");
+    }
+
     #[test]
     fn a_tool_call_without_its_argument_fails() {
         let s = server(Surfaces::tools_only());

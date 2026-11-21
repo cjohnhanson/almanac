@@ -28,6 +28,25 @@ assertions:
     command: "almanac show writing | head -1 | grep -qx \"Base directory for this skill: $(cd local/writing && pwd -P)\""
   - name: "a skill from the declared library prints its own directory"
     command: "almanac show testing | head -1 | grep -qx \"Base directory for this skill: $(cd shared/skills/testing && pwd -P)\""
+  # A library read from git objects has no directory on this machine,
+  # so its skill prints as the SKILL.md alone. Built in its own
+  # directory, so the libraries above stay as they are.
+  - name: "a skill from a git library prints with no directory line"
+    command: |
+      T=$PWD/gitlib && trap 'rm -rf "$T"' EXIT &&
+      mkdir -p "$T/up/skills/gitskill" "$T/lib" &&
+      git -C "$T/up" init -q -b main &&
+      printf 'library: skills\nskills: []\n' > "$T/up/almanac.yml" &&
+      printf -- '---\nname: gitskill\ndescription: From git.\n---\n\n# Git Skill\n' > "$T/up/skills/gitskill/SKILL.md" &&
+      git -C "$T/up" add -A && git -C "$T/up" commit -qm one &&
+      cd "$T/lib" &&
+      printf 'library: local\nskills: []\n' > almanac.yml &&
+      printf 'format: 2\nstores:\n  - alias: up\n    git: file://%s/up\n' "$T" > stores.yml &&
+      XDG_CACHE_HOME="$T/cache" almanac store sync >/dev/null &&
+      XDG_CACHE_HOME="$T/cache" almanac show gitskill > out.txt &&
+      head -1 out.txt | grep -qx -- '---' &&
+      grep -q '# Git Skill' out.txt &&
+      ! grep -q 'Base directory' out.txt
   - name: "the index agrees with the list"
     command: "almanac index | jq -e 'length == 3'"
   - name: "the index holds no duplicate name"
