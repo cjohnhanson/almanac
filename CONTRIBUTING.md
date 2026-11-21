@@ -69,7 +69,7 @@ each one, an agent that did not write the change reads it against the
 criteria in `.agents/skills/<name>/SKILL.md`. It returns one line, which
 names the commit it read:
 
-```
+```text
 signoff[review-tests] PASS 4f1c2ab removed a guard, a_failed_signoff went red
 ```
 

@@ -139,7 +139,9 @@ use it, for an agent's context; it depends only on the binary version.
   because gix would spawn ssh for it.
 - `dev:<path>`: a local snapshot of a skill you develop alongside.
   `sync --check` skips it whatever its state. `status` shows its drift,
-  and `sync` names the drift and leaves the snapshot as it is.
+  and `sync` names the drift and leaves the snapshot as it is. To
+  refresh it, run `almanac remove <name>`, then
+  `almanac add dev:<path> --accept`.
 
 ## Composed libraries
 
@@ -157,8 +159,10 @@ stores:
 
 A skill name is the identity, and two libraries can hold the same name.
 The nearer library wins: this library first, then each declared library
-in declaration order. `list`, `show`, and `index` all give the winner,
-so the list shows what an agent loads.
+in declaration order. `list`, `show`, and `index` give the winner, so
+the list shows what an agent loads. One exception: when a library
+declared with `git:` wins a name that a later library declared with
+`path:` also holds, `show` prints the `path:` library's copy.
 
 A skill that loses a name stays on disk. `almanac check` reports every
 shadowed name and the library it came from.

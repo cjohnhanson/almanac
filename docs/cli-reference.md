@@ -25,7 +25,7 @@ Commands:
   update  Fetch upstream, print the red flags and the diff, then re-pin with --yes
   remove  Remove an entry and its vendored directory. Refuses an unmanaged directory
   status  Print every manifest entry with its pin and drift state, then the unmanaged neighbors
-  list    List the available skills with name, description, and source
+  list    List the available skills with name and description
   show    Print the full SKILL.md content of one skill, after a line that names the skill's
           directory
   index   Print a JSON index of the available skills
@@ -284,10 +284,11 @@ Options:
 ## almanac list
 
 ```text
-List the available skills with name, description, and source
+List the available skills with name and description
 
 Covers this library and the libraries it declares in stores.yml, then each --source directory. A
-name that two libraries hold prints once, from the library that wins it.
+name that two libraries hold prints once, from the library that wins it. Every row ends in
+`[file]`, whichever library holds the skill.
 
 Usage: almanac list [OPTIONS]
 
@@ -302,6 +303,9 @@ Options:
 
   -s, --source <SOURCES>
           Skill source directory. Repeatable
+          
+          With --source, no library is found by walking up: the --root directory, or the working
+          directory, is read as it is.
 
       --home
           Act on the configured root library (`almanac store root`), wherever the command runs
@@ -322,7 +326,9 @@ The first line names the absolute directory that holds the SKILL.md, so a relati
 skill body resolves against it. A skill from a library that lives in git has no directory on this
 machine, and prints without that line. A skill directory with a references/ directory ends with a
 `## References` section, one `almanac show` command for each file. `almanac show
-<name>/references/<file>` prints one reference file. Exits 1 when the skill is not found.
+<name>/references/<file>` prints one reference file. Exits 1 when the skill is not found. A skill
+directory on this machine is searched first, so when a library declared with git: wins a name that
+a later path: library also holds, show prints the path: library's copy.
 
 Usage: almanac show [OPTIONS] <NAME>
 
@@ -341,6 +347,9 @@ Options:
 
   -s, --source <SOURCES>
           Skill source directory. Repeatable
+          
+          With --source, no library is found by walking up: the --root directory, or the working
+          directory, is read as it is.
 
       --home
           Act on the configured root library (`almanac store root`), wherever the command runs
@@ -373,6 +382,9 @@ Options:
 
   -s, --source <SOURCES>
           Skill source directory. Repeatable
+          
+          With --source, no library is found by walking up: the --root directory, or the working
+          directory, is read as it is.
 
       --home
           Act on the configured root library (`almanac store root`), wherever the command runs
@@ -577,8 +589,10 @@ Options:
 Serve this library over MCP
 
 The server is read-only, and no flag changes that. It has no authentication: bind it to 127.0.0.1,
-or put a proxy that authenticates in front of it. The library is chosen as for a write, so serve
-never falls back to the root library, and it names a library it found above the working directory.
+or put a proxy that authenticates in front of it. serve picks its library as a write does: it
+never falls back to the root library. It names a library it found above the working directory on
+stderr.
+
 Tools: `almanac_list_skills`, `almanac_get_skill`, and `almanac_check`. Resources:
 `skill://<name>/SKILL.md` and `skill://<name>/references/<file>`.
 

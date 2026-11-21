@@ -210,13 +210,17 @@ pub enum Command {
 
     // Handler: run_command, Command::List (src/cli.rs), cmd_list and
     // reachable_skills (src/cli.rs).
-    /// List the available skills with name, description, and source
+    /// List the available skills with name and description
     ///
     /// Covers this library and the libraries it declares in stores.yml,
     /// then each --source directory. A name that two libraries hold
-    /// prints once, from the library that wins it.
+    /// prints once, from the library that wins it. Every row ends in
+    /// `[file]`, whichever library holds the skill.
     List {
         /// Skill source directory. Repeatable
+        ///
+        /// With --source, no library is found by walking up: the --root
+        /// directory, or the working directory, is read as it is.
         #[arg(long = "source", short = 's')]
         sources: Vec<String>,
     },
@@ -233,12 +237,18 @@ pub enum Command {
     /// with a references/ directory ends with a `## References` section,
     /// one `almanac show` command for each file. `almanac show
     /// <name>/references/<file>` prints one reference file. Exits 1 when
-    /// the skill is not found.
+    /// the skill is not found. A skill directory on this machine is
+    /// searched first, so when a library declared with git: wins a name
+    /// that a later path: library also holds, show prints the path:
+    /// library's copy.
     Show {
         /// The skill name to print
         name: String,
 
         /// Skill source directory. Repeatable
+        ///
+        /// With --source, no library is found by walking up: the --root
+        /// directory, or the working directory, is read as it is.
         #[arg(long = "source", short = 's')]
         sources: Vec<String>,
     },
@@ -251,6 +261,9 @@ pub enum Command {
     /// for each skill. The skills are the ones `almanac list` prints.
     Index {
         /// Skill source directory. Repeatable
+        ///
+        /// With --source, no library is found by walking up: the --root
+        /// directory, or the working directory, is read as it is.
         #[arg(long = "source", short = 's')]
         sources: Vec<String>,
         /// Print a markdown skills index for an agent's context
@@ -303,10 +316,12 @@ pub enum Command {
     ///
     /// The server is read-only, and no flag changes that. It has no
     /// authentication: bind it to 127.0.0.1, or put a proxy that
-    /// authenticates in front of it. The library is chosen as for a
-    /// write, so serve never falls back to the root library, and it
-    /// names a library it found above the working directory. Tools: `almanac_list_skills`,
-    /// `almanac_get_skill`, and `almanac_check`. Resources:
+    /// authenticates in front of it. serve picks its library as a write
+    /// does: it never falls back to the root library. It names a library
+    /// it found above the working directory on stderr.
+    ///
+    /// Tools: `almanac_list_skills`, `almanac_get_skill`, and
+    /// `almanac_check`. Resources:
     /// `skill://<name>/SKILL.md` and `skill://<name>/references/<file>`.
     Serve {
         /// The surfaces to offer, separated by commas: skills,

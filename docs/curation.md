@@ -135,11 +135,13 @@ manifest and the content live in the same repo.
   same way. ssh is refused, because almanac spawns no ssh process.
 - `dev:<path>`: a local snapshot of a skill you develop alongside.
   `sync --check` skips it whatever its state. `status` shows its drift,
-  and `sync` names the drift and leaves the snapshot as it is.
+  and `sync` names the drift and leaves the snapshot as it is. To
+  refresh it, run `almanac remove <name>`, then
+  `almanac add dev:<path> --accept`.
 
 Almanac reads a local repository in place. To fetch a pinned commit
 from a server, almanac tries a direct sha fetch, then the recorded ref,
-then a full clone. It uses the first one the server permits.
+then a full fetch. It uses the first one the server permits.
 
 ## Integrity
 

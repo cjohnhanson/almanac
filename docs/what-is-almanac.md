@@ -21,8 +21,10 @@ Almanac reads skills from directories on disk. The main directory is
 the curated library that `almanac.yml` governs. Read `almanac docs
 curation` for the manifest workflow.
 
-Add more directories with `--source`. Each `--source` flag adds one
-directory. Nothing is compiled into the binary.
+`list`, `show`, and `index` read more directories with `--source`.
+Each `--source` flag adds one directory. With `--source`, almanac does
+not walk up to find a library: it reads the `--root` directory, or the
+working directory, as it is. Nothing is compiled into the binary.
 
 A library can also declare other libraries in `stores.yml`, under local
 aliases. The nearer library wins a skill name: this library first, then

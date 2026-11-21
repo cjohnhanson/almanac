@@ -52,8 +52,11 @@ The nearer library wins. This library comes first. Each declared
 library follows, in the order that `stores.yml` lists them. A library
 that a declared library declares comes after that one.
 
-`list`, `show`, and `index` all give the winner, so the list shows what
-an agent loads. Both this library and `shared` hold `writing`:
+`list`, `show`, and `index` give the winner, so the list shows what an
+agent loads. One exception: when a library declared with `git:` wins a
+name that a later library declared with `path:` also holds, `show`
+prints the `path:` library's copy, and `list`, `index`, and `check`
+name the `git:` library. Both this library and `shared` hold `writing`:
 
 ```console
 $ almanac list
@@ -209,7 +212,7 @@ That decision belongs to a person at the command line. A remote caller
 reads what the library already holds.
 
 `serve` picks its library as a write does, although it changes nothing.
-A served library must never rest on a fallback its clients cannot see,
-so `serve` needs a library at or above the working directory, `--root`,
-or `--home`, and it names a library it found above the working
-directory on stderr.
+A served library must not rest on a fallback that its clients cannot
+see. So `serve` needs a library at or above the working directory,
+`--root`, or `--home`. When it finds the library above the working
+directory, it names that library on stderr.
