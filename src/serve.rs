@@ -161,8 +161,9 @@ impl AlmanacServer {
             ),
             Tool::new(
                 "almanac_get_skill",
-                "Return the full text of one skill, by name. Optionally a file beside it, \
-                 such as references/deep-dive.md.",
+                "Return the full text of one skill, by name, after a line that names the \
+                 skill's directory. Optionally a file beside it, such as \
+                 references/deep-dive.md.",
                 Arc::new(schema_with(&[
                     ("name", "The skill name.", true),
                     ("file", "A file beside the SKILL.md.", false),
@@ -206,11 +207,18 @@ impl AlmanacServer {
                     .map_err(|e| Error::General(e.to_string()))?;
                 let file = mdstore::mcp::optional_str(args, "file")
                     .map_err(|e| Error::General(e.to_string()))?;
-                let uri = file.map_or_else(
-                    || format!("{SCHEME}://{skill}/SKILL.md"),
-                    |file| format!("{SCHEME}://{skill}/{file}"),
-                );
-                self.read_uri(&uri)
+                // The skill itself comes back as `almanac show` prints
+                // it, with its directory first. The resource at
+                // skill://<name>/SKILL.md stays verbatim, because its
+                // digest covers those bytes.
+                let Some(file) = file else {
+                    let ws = self.workspace()?;
+                    let view = ws
+                        .resolve(skill)
+                        .ok_or_else(|| Error::General(format!("no skill named '{skill}'")))?;
+                    return ws.show_skill(&view);
+                };
+                self.read_uri(&format!("{SCHEME}://{skill}/{file}"))
             }
             "almanac_check" => {
                 let ws = self.workspace()?;
@@ -657,6 +665,31 @@ mod tests {
         args.insert("file".into(), json!("references/deep-dive.md"));
         let sub = s.call("almanac_get_skill", &args).unwrap();
         assert!(sub.contains("# Deep dive"), "{sub}");
+    }
+
+    /// The tool hands an agent the skill directory, so a link to a
+    /// sibling file or a script resolves. The resource stays the
+    /// SKILL.md byte for byte, because its digest covers those bytes.
+    #[test]
+    fn get_skill_names_the_skill_directory_and_the_resource_stays_verbatim() {
+        let s = server(Surfaces::skills_and_tools());
+        let skill_dir = fixture().join("skills/writing").canonicalize().unwrap();
+        let mut args = Map::new();
+        args.insert("name".into(), json!("writing"));
+        let text = s.call("almanac_get_skill", &args).unwrap();
+        let first = text.lines().next().unwrap();
+        assert_eq!(
+            first,
+            format!("Base directory for this skill: {}", skill_dir.display())
+        );
+        assert!(text.contains("# Writing"), "{text}");
+
+        let resource = s.read_uri("skill://writing/SKILL.md").unwrap();
+        assert!(resource.starts_with("---\n"), "{resource}");
+
+        args.insert("file".into(), json!("references/deep-dive.md"));
+        let sub = s.call("almanac_get_skill", &args).unwrap();
+        assert!(sub.starts_with("# Deep dive"), "{sub}");
     }
 
     #[test]

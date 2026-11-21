@@ -165,8 +165,26 @@ almanac show <name> [--source <path>]
 | `<name>` | | Skill name to print |
 | `--source <path>` | `-s` | Skill source directory. Repeatable |
 
-Almanac prints the raw SKILL.md content to stdout. It exits with an
-error when the skill is not found.
+The first line names the absolute directory that holds the SKILL.md.
+A blank line follows, then the raw SKILL.md content. A relative path in
+the skill body, such as a sibling file or a script under `scripts/`,
+resolves against that directory:
+
+```
+Base directory for this skill: /home/me/skills/writing
+
+---
+name: writing
+description: How to write.
+---
+```
+
+A skill from a library that lives in git has no directory on this
+machine, and prints without the first line. `almanac show
+<name>/references/<file>` prints the reference file alone. The
+`almanac_get_skill` tool of `almanac serve` returns the same text as
+`almanac show`. Almanac exits with an error when the skill is not
+found.
 
 ### `almanac index`
 

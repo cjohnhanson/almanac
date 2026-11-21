@@ -24,6 +24,10 @@ assertions:
     should_fail: true
   - name: "a name only the declared library holds still resolves"
     command: "almanac show testing | grep -q '# Testing'"
+  - name: "show prints the directory of the library that won the name"
+    command: "almanac show writing | head -1 | grep -qx \"Base directory for this skill: $(cd local/writing && pwd -P)\""
+  - name: "a skill from the declared library prints its own directory"
+    command: "almanac show testing | head -1 | grep -qx \"Base directory for this skill: $(cd shared/skills/testing && pwd -P)\""
   - name: "the index agrees with the list"
     command: "almanac index | jq -e 'length == 3'"
   - name: "the index holds no duplicate name"

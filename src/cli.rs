@@ -142,7 +142,8 @@ pub enum Command {
         #[arg(long = "source", short = 's')]
         sources: Vec<String>,
     },
-    /// Print the full SKILL.md content of one skill.
+    /// Print the full SKILL.md content of one skill, after a line that
+    /// names the skill's directory.
     Show {
         /// The skill name to print.
         name: String,
@@ -617,7 +618,7 @@ fn cmd_show(root: &Path, name: &str, sources: &[SkillSource]) -> Result<(), Erro
         if let Some(view) = ws.resolve(skill_name) {
             match file {
                 None => {
-                    print!("{}", ws.read_skill(&view)?);
+                    print!("{}", ws.show_skill(&view)?);
                     return Ok(());
                 }
                 Some(wanted) => {
