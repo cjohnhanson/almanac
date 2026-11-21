@@ -52,11 +52,17 @@ The nearer library wins. This library comes first. Each declared
 library follows, in the order that `stores.yml` lists them. A library
 that a declared library declares comes after that one.
 
-`list`, `show`, and `index` give the winner, so the list shows what an
-agent loads. One exception: when a library declared with `git:` wins a
-name that a later library declared with `path:` also holds, `show`
-prints the `path:` library's copy, and `list`, `index`, and `check`
-name the `git:` library. Both this library and `shared` hold `writing`:
+`list` and `index` give the winner, so the list shows what an agent
+loads. `show` gives the winner too, except against a library declared
+with `git:`. `show` reads every skill directory on this machine first:
+this library, each `path:` library, and each `--source` directory. So
+when a `git:` library wins a name that one of those directories also
+holds, `show` prints the directory's copy. `list` and `index` still give
+the `git:` library's copy, and `check` names the `git:` library as the
+winner.
+
+In the example, both this library and `shared` hold `writing`, and
+this library wins:
 
 ```console
 $ almanac list
@@ -78,8 +84,9 @@ Write the subject line in the imperative mood.
 
 ## A shadowed name is reported
 
-A skill that loses a name is still on disk. It is invisible to `show`,
-which is a surprise if you do not know it happened.
+A skill that loses a name is still on disk. `list` and `index` leave it
+out, and `show` prints the winner instead, except in the `git:` case
+above. That is a surprise if you do not know it happened.
 
 `almanac check` reports every shadowed name, the library that won it,
 and each library that also holds it. Run the command when a skill does

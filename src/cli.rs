@@ -219,8 +219,9 @@ pub enum Command {
     List {
         /// Skill source directory. Repeatable
         ///
-        /// With --source, no library is found by walking up: the --root
-        /// directory, or the working directory, is read as it is.
+        /// With --source, almanac does not walk up to find a library: it
+        /// reads the --root directory, or the working directory, as it
+        /// is. A relative --source path is read from that directory.
         #[arg(long = "source", short = 's')]
         sources: Vec<String>,
     },
@@ -237,18 +238,23 @@ pub enum Command {
     /// with a references/ directory ends with a `## References` section,
     /// one `almanac show` command for each file. `almanac show
     /// <name>/references/<file>` prints one reference file. Exits 1 when
-    /// the skill is not found. A skill directory on this machine is
-    /// searched first, so when a library declared with git: wins a name
-    /// that a later path: library also holds, show prints the path:
-    /// library's copy.
+    /// the skill is not found.
+    ///
+    /// show reads every skill directory on this machine first: this
+    /// library, each path: library, and each --source directory. Only
+    /// then does it read a library declared with git:. So when a git:
+    /// library wins a name that one of those directories also holds,
+    /// show prints the directory's copy, while list and index give the
+    /// git: library's copy.
     Show {
         /// The skill name to print
         name: String,
 
         /// Skill source directory. Repeatable
         ///
-        /// With --source, no library is found by walking up: the --root
-        /// directory, or the working directory, is read as it is.
+        /// With --source, almanac does not walk up to find a library: it
+        /// reads the --root directory, or the working directory, as it
+        /// is. A relative --source path is read from that directory.
         #[arg(long = "source", short = 's')]
         sources: Vec<String>,
     },
@@ -262,8 +268,9 @@ pub enum Command {
     Index {
         /// Skill source directory. Repeatable
         ///
-        /// With --source, no library is found by walking up: the --root
-        /// directory, or the working directory, is read as it is.
+        /// With --source, almanac does not walk up to find a library: it
+        /// reads the --root directory, or the working directory, as it
+        /// is. A relative --source path is read from that directory.
         #[arg(long = "source", short = 's')]
         sources: Vec<String>,
         /// Print a markdown skills index for an agent's context
