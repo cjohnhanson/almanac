@@ -639,7 +639,10 @@ fn file_fences_land_and_commits_are_repeatable() {
     std::fs::write(&first, text.replace("SHA\n", "[..]\n")).unwrap();
     run_page(&probe, &first);
     let work = probe.join("repeatable/page.in");
-    let out = Command::new("git")
+    // Through the page's own git wrapper, which clears the environment:
+    // a plain `git` here would follow a git hook's `GIT_DIR` to the
+    // repository being pushed.
+    let out = Command::new(probe.join("repeatable/bin/git"))
         .args(["rev-parse", "HEAD"])
         .current_dir(&work)
         .output()
