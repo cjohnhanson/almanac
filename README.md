@@ -26,14 +26,14 @@ pages, the README and the licence. There is no Windows build.
 On Debian or Ubuntu, download the `.deb` from the [releases
 page](https://github.com/cjohnhanson/almanac/releases) and install it:
 
-```
+```sh
 wget https://github.com/cjohnhanson/almanac/releases/download/v0.2.5/lmnc_0.2.5-1_amd64.deb
 sudo dpkg -i lmnc_0.2.5-1_amd64.deb
 ```
 
 To run it once without installing anything:
 
-```
+```sh
 uvx lmnc list
 npx @cjohnhanson/lmnc list
 ```
@@ -47,7 +47,7 @@ compiles with Rust 1.88 or newer. A C compiler is needed as well, which
 
 To build almanac:
 
-```
+```sh
 git clone https://github.com/cjohnhanson/almanac
 cd almanac
 cargo build --release
@@ -56,11 +56,51 @@ cargo build --release
 
 ## Usage
 
-```sh
-almanac list                  # every skill, with descriptions
-almanac show <name>           # the skill directory, then the SKILL.md
-almanac index                 # a JSON index for machines
-almanac docs [topic]          # the bundled documentation
+`almanac init` makes the working directory a library. Its skills live in
+`skills/`:
+
+```console
+$ almanac init
+initialized almanac.yml (library: skills)
+
+```
+
+```markdown {filename="skills/writing/SKILL.md"}
+---
+name: writing
+description: How to write a commit message.
+---
+
+Write the subject line in the imperative mood.
+```
+
+`list` prints every skill with its description. `show` prints the skill
+directory, then the SKILL.md. `index` prints a JSON index for machines,
+and `docs` lists the bundled documentation:
+
+```console
+$ almanac list
+writing                        How to write a commit message. [file]
+
+$ almanac show writing
+Base directory for this skill: [CWD]/skills/writing
+
+---
+name: writing
+description: How to write a commit message.
+---
+
+Write the subject line in the imperative mood.
+
+$ almanac index
+[{"description":"How to write a commit message.","name":"writing","source":{"file":"skills/writing/SKILL.md"}}]
+
+$ almanac docs
+  cli-reference        Complete command reference for the almanac skill aggregator
+  composition          Declaring other libraries, name precedence, and skill requirements.
+  curation             The manifest workflow: add, sync, update, drift, and the trust model.
+  what-is-almanac      Agent skill aggregation from pluggable sources
+
 ```
 
 ## How it works
@@ -92,12 +132,16 @@ use it, for an agent's context; it depends only on the binary version.
 ## Sources
 
 - `github:owner/repo` (or bare `owner/repo`): pinned by commit and hash.
-- `git:<url>`: any git server over https, git://, or a local path.
-  Almanac tries a sha fetch, then the recorded ref, then a full fetch,
-  all in-process on gix. No git program runs. An ssh URL is refused,
+- `git:<url>`: any git server over http, https, or git://, or a local
+  path. Almanac reads a local repository in place. From a server it
+  tries a sha fetch, then the recorded ref, then a full fetch, all
+  in-process on gix. No git program runs. An ssh URL is refused,
   because gix would spawn ssh for it.
 - `dev:<path>`: a local snapshot of a skill you develop alongside.
-  `sync --check` skips it and reports drift as information.
+  `sync --check` skips it whatever its state. `status` shows its drift,
+  and `sync` names the drift and leaves the snapshot as it is. To
+  refresh it, run `almanac remove <name>`, then
+  `almanac add dev:<path> --accept`.
 
 ## Composed libraries
 
@@ -115,11 +159,16 @@ stores:
 
 A skill name is the identity, and two libraries can hold the same name.
 The nearer library wins: this library first, then each declared library
-in declaration order. `list`, `show`, and `index` all give the winner,
-so the list shows what an agent loads.
+in declaration order. `list` and `index` give the winner, so the list
+shows what an agent loads. `show` first reads the directories on this
+machine: this library, each `path:` library, and each `--source`
+directory. It reads a `git:` library after them. So when a `git:`
+library wins a name that one of those directories also holds, `show`
+prints the directory's copy.
 
 A skill that loses a name stays on disk. `almanac check` reports every
-shadowed name and the library it came from.
+shadowed name and the library it came from. It does not read `--source`
+directories.
 
 A skill declares the skills it needs:
 
@@ -134,8 +183,8 @@ requires:
 ```
 
 An entry with no alias names a skill in the same library. `almanac
-check` reports an entry that names no skill, and an entry that uses an
-alias the library does not declare.
+check` reports an entry that names no skill. An entry whose prefix is
+not a declared alias is read as a plain name, and reported the same way.
 
 `almanac store list` shows the libraries and their skill counts.
 `almanac store sync` fetches the remote ones into a local cache. Four
@@ -145,10 +194,10 @@ answer never changes because of a fetch nobody asked for.
 
 ## Serving a library
 
-```sh
-almanac serve                          # stdin and stdout, for a child process
-almanac serve --bind 127.0.0.1:8931    # for clients that connect
-```
+- `almanac serve` speaks MCP on stdin and stdout, for a client that
+  starts the process.
+- `almanac serve --bind 127.0.0.1:8931` serves over HTTP at
+  `http://127.0.0.1:8931/mcp`, for a client that connects.
 
 The server offers the skills extension, readable resources, and tools.
 A client cannot be asked which it understands, so the surfaces are
@@ -156,7 +205,9 @@ configuration: `--surfaces skills,resources,tools`. The default is
 `skills,tools`, because every client can call a tool. A served library
 is read-only, and no flag changes that: curating a skill is a decision
 a person makes at the command line. It also has no authentication, so
-bind it to `127.0.0.1` or put an authenticating proxy in front.
+bind it to `127.0.0.1` or put an authenticating proxy in front. `serve`
+picks its library as a write does, so it never falls back to the root
+library.
 
 Read `almanac docs composition` for the model.
 
@@ -164,6 +215,7 @@ Read `almanac docs composition` for the model.
 
 - [What is Almanac?](docs/what-is-almanac.md): skill format, sources, design
 - [Curation and pinning](docs/curation.md): the manifest workflow and the trust model
+- [Composed libraries](docs/composition.md): declaring other libraries, precedence, requirements, and serving
 - [CLI reference](docs/cli-reference.md): every command and flag
 
 ## Related

@@ -14,7 +14,8 @@ before anything changes.
 
 - Never edit a file inside a vendored skill directory. Fix it upstream
   and run `almanac update <name>`, or use a `dev:` source to iterate
-  locally.
+  locally. `update` skips a `dev:` entry: to refresh one, run
+  `almanac remove <name>`, then `almanac add dev:<path> --accept`.
 - Run `almanac add <source>` to stage a skill and print its red-flag
   report. Nothing lands without `--accept`. Read the report before you
   accept: a flag marks content to inspect.
