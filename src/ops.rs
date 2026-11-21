@@ -432,19 +432,31 @@ pub fn index_md(dir: &Path, max_bytes: usize) -> Result<String, Error> {
             path: library.to_string_lossy().into_owned(),
         }],
     );
-    Ok(format_index_md(&entries, max_bytes))
+    Ok(format_index_md(&entries, max_bytes, false))
 }
 
 /// The markdown index over explicit path sources. This needs no
 /// manifest, so a plain skill directory can feed a gaff section.
 #[must_use]
 pub fn index_md_sources(dir: &Path, sources: &[SkillSource], max_bytes: usize) -> String {
-    format_index_md(&skill::index(dir, sources), max_bytes)
+    format_index_md(&skill::index(dir, sources), max_bytes, false)
 }
 
+/// The markdown index text.
+///
+/// `home` is true when the index came from the
+/// root library through `--home`. The header's load hint then carries
+/// `--home` too: the index is read in a cwd that may hold its own
+/// almanac.yml, and a plain `almanac show` there resolves that library
+/// instead.
 #[must_use]
-pub fn format_index_md(entries: &[skill::SkillEntry], max_bytes: usize) -> String {
-    let mut out = String::from("Available skills (show with `almanac show <name>`):\n");
+pub fn format_index_md(entries: &[skill::SkillEntry], max_bytes: usize, home: bool) -> String {
+    let show = if home {
+        "almanac show --home"
+    } else {
+        "almanac show"
+    };
+    let mut out = format!("Available skills (show with `{show} <name>`):\n");
     let mut omitted = 0usize;
     for e in entries {
         let full = format!("- **{}** — {}\n", e.name, e.description);

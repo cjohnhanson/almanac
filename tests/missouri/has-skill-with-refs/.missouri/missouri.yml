@@ -13,6 +13,15 @@ assertions:
   - name: "references listing includes examples.md"
     command: "almanac show test-skill --source ./skills | grep -q 'almanac show test-skill/references/examples.md'"
 
+  - name: "show prints the skill directory on its first line"
+    command: "almanac show test-skill --source ./skills | head -1 | grep -qx \"Base directory for this skill: $(cd skills/test-skill && pwd -P)\""
+
+  - name: "the printed directory resolves a sibling file and a script"
+    command: "d=$(almanac show test-skill --source ./skills | head -1 | sed 's/^Base directory for this skill: //') && test -f \"$d/NOTES.md\" && test -x \"$d/scripts/hello.sh\""
+
+  - name: "a reference file prints no directory line"
+    command: "almanac show test-skill/references/deep-dive.md --source ./skills | head -1 | grep -q '^# Deep Dive'"
+
   - name: "show skill without references has no listing"
     command: "! almanac show plain-skill --source ./skills | grep -q '## References'"
 

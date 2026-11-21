@@ -464,18 +464,37 @@ impl Workspace {
     /// Files beside a skill's SKILL.md that could not be read.
     #[must_use]
     pub fn skill_file_problems(&self, view: &View<'_>) -> Vec<String> {
-        let member = &self.snapshot.graph.members[view.id.member];
-        let Some(mdstore::StoreContent::Dir(root)) = member.content.as_ref() else {
+        let Some(skill_dir) = self.skill_dir(view) else {
             return Vec::new();
         };
-        let Some(parent) = std::path::Path::new(&view.skill.rel_path).parent() else {
-            return Vec::new();
-        };
-        let skill_dir = root.root().join(parent);
         let mut problems = Vec::new();
         collect_problems(&skill_dir, &skill_dir, &mut problems);
         problems.sort();
         problems
+    }
+
+    /// The directory that holds a skill's SKILL.md, in the library that
+    /// won its name. None for a library read from git objects, which
+    /// has no directory on this machine.
+    #[must_use]
+    pub fn skill_dir(&self, view: &View<'_>) -> Option<std::path::PathBuf> {
+        let member = &self.snapshot.graph.members[view.id.member];
+        let Some(mdstore::StoreContent::Dir(root)) = member.content.as_ref() else {
+            return None;
+        };
+        let parent = std::path::Path::new(&view.skill.rel_path).parent()?;
+        Some(root.root().join(parent))
+    }
+
+    /// The SKILL.md text of a skill with its directory on the first
+    /// line, as `almanac show` prints it. A skill read from git has no
+    /// directory, and its text comes back unchanged.
+    pub fn show_skill(&self, view: &View<'_>) -> Result<String, Error> {
+        let text = self.read_skill(view)?;
+        Ok(match self.skill_dir(view) {
+            Some(dir) => crate::skill::with_skill_dir(&dir, &text),
+            None => text,
+        })
     }
 
     /// The files beside a skill's SKILL.md, each with its bytes.

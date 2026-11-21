@@ -97,11 +97,29 @@ pub fn show_captured(
                 .map_err(|e| Error::General(format!("failed to read {path}: {e}")))?;
             let skill_dir = Path::new(path).parent().unwrap_or_else(|| Path::new("."));
             append_file_references(name, skill_dir, &mut content);
-            return Ok(Some(content));
+            return Ok(Some(with_skill_dir(skill_dir, &content)));
         }
     }
 
     Ok(None)
+}
+
+/// Put the skill's absolute directory on the first line, then a blank
+/// line, then the content.
+///
+/// A skill links files beside its SKILL.md and runs scripts from its
+/// own directory. A relative path in the body resolves against this
+/// directory, and the reader's cwd is usually somewhere else.
+#[must_use]
+pub fn with_skill_dir(skill_dir: &Path, content: &str) -> String {
+    let dir = skill_dir
+        .canonicalize()
+        .or_else(|_| std::path::absolute(skill_dir))
+        .unwrap_or_else(|_| skill_dir.to_path_buf());
+    format!(
+        "Base directory for this skill: {}\n\n{content}",
+        dir.display()
+    )
 }
 
 /// Parse "skill-name/references/file.md" into ("skill-name", "file.md").
@@ -892,6 +910,57 @@ mod tests {
         let output = show_to_string("plain-skill", dir.path(), &sources);
         assert!(output.contains("# Plain"));
         assert!(!output.contains("## References"));
+    }
+
+    /// A skill links files beside its SKILL.md and runs scripts from
+    /// its own directory. Those paths resolve only against the skill
+    /// directory, never against the caller's cwd, so show prints it.
+    #[test]
+    fn show_prints_the_skill_directory_first() {
+        let dir = tempfile::tempdir().unwrap();
+        let skill = dir.path().join("skills").join("my-skill");
+        std::fs::create_dir_all(skill.join("scripts")).unwrap();
+        std::fs::write(
+            skill.join("SKILL.md"),
+            "---\nname: my-skill\ndescription: test\n---\n\nRead DREAM.md. Run scripts/go.sh.\n",
+        )
+        .unwrap();
+        std::fs::write(skill.join("DREAM.md"), "# Dream\n").unwrap();
+        std::fs::write(skill.join("scripts/go.sh"), "#!/bin/sh\n").unwrap();
+        // A relative source with a `..` in it, so the printed path must
+        // be made absolute and normalized on every platform.
+        std::fs::create_dir_all(dir.path().join("sub")).unwrap();
+        let sources = vec![SkillSource::Path {
+            path: "./sub/../skills/".into(),
+        }];
+
+        let out = show_to_string("my-skill", dir.path(), &sources);
+        let (first, rest) = out.split_once('\n').unwrap();
+        let printed = first
+            .strip_prefix("Base directory for this skill: ")
+            .unwrap_or_else(|| panic!("no directory line:\n{out}"));
+        let printed = Path::new(printed);
+        assert!(printed.is_absolute(), "{printed:?} is not absolute");
+        assert_eq!(printed, skill.canonicalize().unwrap());
+        assert!(printed.join("DREAM.md").is_file());
+        assert!(printed.join("scripts/go.sh").is_file());
+        // One blank line, then the SKILL.md byte for byte.
+        assert_eq!(
+            rest,
+            format!(
+                "\n{}",
+                std::fs::read_to_string(skill.join("SKILL.md")).unwrap()
+            )
+        );
+    }
+
+    /// A reference file is a document, not a skill, and prints as is.
+    #[test]
+    fn a_reference_file_prints_no_directory_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let sources = make_skill_with_refs(dir.path());
+        let out = show_to_string("my-skill/references/deep-dive.md", dir.path(), &sources);
+        assert!(out.starts_with("# Deep Dive"), "{out}");
     }
 
     /// Helper: capture `show()` output as a string instead of printing to stdout.

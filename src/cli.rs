@@ -142,7 +142,8 @@ pub enum Command {
         #[arg(long = "source", short = 's')]
         sources: Vec<String>,
     },
-    /// Print the full SKILL.md content of one skill.
+    /// Print the full SKILL.md content of one skill, after a line that
+    /// names the skill's directory.
     Show {
         /// The skill name to print.
         name: String,
@@ -223,6 +224,17 @@ pub fn prime() -> String {
 /// Run one CLI command. A host that mounts almanac as a subcommand
 /// calls this with its own sources.
 pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Result<(), Error> {
+    run_command_at(root, sources, command, false)
+}
+
+/// Run one CLI command. `home` is true when `--home` chose the root,
+/// so text that tells an agent what to run next can carry it.
+fn run_command_at(
+    root: &Path,
+    sources: &[SkillSource],
+    command: Command,
+    home: bool,
+) -> Result<(), Error> {
     match command {
         Command::GenMan { dir } => {
             use clap::CommandFactory as _;
@@ -268,7 +280,7 @@ pub fn run_command(root: &Path, sources: &[SkillSource], command: Command) -> Re
             let all_sources = merge_sources(sources, &extra_sources);
             if md {
                 let entries = reachable_skills(root, &all_sources);
-                print!("{}", crate::ops::format_index_md(&entries, max_bytes));
+                print!("{}", crate::ops::format_index_md(&entries, max_bytes, home));
             } else {
                 cmd_index(root, &all_sources);
             }
@@ -451,7 +463,7 @@ pub fn run(args: Args) -> Result<(), Error> {
     // root. Taken from the literal argument instead, a walked or
     // fallback run would list nothing and say nothing.
     let root = resolved.root;
-    run_command(&root, &manifest_sources(&root), args.command)
+    run_command_at(&root, &manifest_sources(&root), args.command, args.home)
 }
 
 const VOCAB: mdstore::resolve::Vocabulary<'static> = mdstore::resolve::Vocabulary {
@@ -617,7 +629,7 @@ fn cmd_show(root: &Path, name: &str, sources: &[SkillSource]) -> Result<(), Erro
         if let Some(view) = ws.resolve(skill_name) {
             match file {
                 None => {
-                    print!("{}", ws.read_skill(&view)?);
+                    print!("{}", ws.show_skill(&view)?);
                     return Ok(());
                 }
                 Some(wanted) => {
