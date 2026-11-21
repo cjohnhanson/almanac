@@ -26,14 +26,14 @@ pages, the README and the licence. There is no Windows build.
 On Debian or Ubuntu, download the `.deb` from the [releases
 page](https://github.com/cjohnhanson/almanac/releases) and install it:
 
-```
+```sh
 wget https://github.com/cjohnhanson/almanac/releases/download/v0.2.5/lmnc_0.2.5-1_amd64.deb
 sudo dpkg -i lmnc_0.2.5-1_amd64.deb
 ```
 
 To run it once without installing anything:
 
-```
+```sh
 uvx lmnc list
 npx @cjohnhanson/lmnc list
 ```
@@ -47,7 +47,7 @@ compiles with Rust 1.88 or newer. A C compiler is needed as well, which
 
 To build almanac:
 
-```
+```sh
 git clone https://github.com/cjohnhanson/almanac
 cd almanac
 cargo build --release
@@ -56,11 +56,51 @@ cargo build --release
 
 ## Usage
 
-```sh
-almanac list                  # every skill, with descriptions
-almanac show <name>           # the skill directory, then the SKILL.md
-almanac index                 # a JSON index for machines
-almanac docs [topic]          # the bundled documentation
+`almanac init` makes the working directory a library. Its skills live in
+`skills/`:
+
+```console
+$ almanac init
+initialized almanac.yml (library: skills)
+
+```
+
+```markdown {filename="skills/writing/SKILL.md"}
+---
+name: writing
+description: How to write a commit message.
+---
+
+Write the subject line in the imperative mood.
+```
+
+`list` prints every skill with its description. `show` prints the skill
+directory, then the SKILL.md. `index` prints a JSON index for machines,
+and `docs` lists the bundled documentation:
+
+```console
+$ almanac list
+writing                        How to write a commit message. [file]
+
+$ almanac show writing
+Base directory for this skill: [CWD]/skills/writing
+
+---
+name: writing
+description: How to write a commit message.
+---
+
+Write the subject line in the imperative mood.
+
+$ almanac index
+[{"description":"How to write a commit message.","name":"writing","source":{"file":"skills/writing/SKILL.md"}}]
+
+$ almanac docs
+  cli-reference        Complete command reference for the almanac skill aggregator
+  composition          Declaring other libraries, name precedence, and skill requirements.
+  curation             The manifest workflow: add, sync, update, drift, and the trust model.
+  what-is-almanac      Agent skill aggregation from pluggable sources
+
 ```
 
 ## How it works
@@ -92,9 +132,10 @@ use it, for an agent's context; it depends only on the binary version.
 ## Sources
 
 - `github:owner/repo` (or bare `owner/repo`): pinned by commit and hash.
-- `git:<url>`: any git server over https, git://, or a local path.
-  Almanac tries a sha fetch, then the recorded ref, then a full fetch,
-  all in-process on gix. No git program runs. An ssh URL is refused,
+- `git:<url>`: any git server over http, https, or git://, or a local
+  path. Almanac reads a local repository in place. From a server it
+  tries a sha fetch, then the recorded ref, then a full fetch, all
+  in-process on gix. No git program runs. An ssh URL is refused,
   because gix would spawn ssh for it.
 - `dev:<path>`: a local snapshot of a skill you develop alongside.
   `sync --check` skips it and reports drift as information.
@@ -145,10 +186,10 @@ answer never changes because of a fetch nobody asked for.
 
 ## Serving a library
 
-```sh
-almanac serve                          # stdin and stdout, for a child process
-almanac serve --bind 127.0.0.1:8931    # for clients that connect
-```
+- `almanac serve` speaks MCP on stdin and stdout, for a client that
+  starts the process.
+- `almanac serve --bind 127.0.0.1:8931` serves over HTTP at
+  `http://127.0.0.1:8931/mcp`, for a client that connects.
 
 The server offers the skills extension, readable resources, and tools.
 A client cannot be asked which it understands, so the surfaces are

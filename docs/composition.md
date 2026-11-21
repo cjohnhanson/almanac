@@ -11,18 +11,37 @@ wrote, a team library holds what the team shares, and an upstream
 library holds what somebody else maintains.
 
 A library declares the other libraries that it draws on. The
-declarations live in `stores.yml`, beside `almanac.yml`:
+declarations live in `stores.yml`, beside `almanac.yml`. The examples
+on this page start in a library that holds a `writing` skill, beside a
+team library in `../team-skills` and a git repository in `../upstream`:
 
-```yaml
+```yaml {filename="stores.yml"}
 format: 2
 stores:
   - alias: shared
     path: ../team-skills
   - alias: upstream
-    git: https://example.com/org/skills
+    git: ../upstream
 ```
 
-Each declaration takes a `path:`, a `git:` URL, or a `blob:` prefix.
+Each declaration takes a `path:`, a `git:` URL, or a `blob:` prefix. A
+`git:` URL can also be an https URL, such as
+`https://example.com/org/skills`.
+
+A library that lives in git is read from a local cache, and
+`almanac store sync` fills it. `almanac store list` then shows each
+library in precedence order:
+
+```console
+$ almanac store sync
+upstream  synced
+
+$ almanac store list
+(this library)  [CWD]  1 skill(s)
+shared  ../team-skills  2 skill(s)
+upstream  [PARENT]/upstream  1 skill(s)  synced just now
+
+```
 
 ## Precedence
 
@@ -34,7 +53,25 @@ library follows, in the order that `stores.yml` lists them. A library
 that a declared library declares comes after that one.
 
 `list`, `show`, and `index` all give the winner, so the list shows what
-an agent loads.
+an agent loads. Both this library and `shared` hold `writing`:
+
+```console
+$ almanac list
+writing                        How to write a commit message. [file]
+testing                        How the team tests. [file]
+linting                        How to configure the linters. [file]
+
+$ almanac show writing
+Base directory for this skill: [CWD]/skills/writing
+
+---
+name: writing
+description: How to write a commit message.
+---
+
+Write the subject line in the imperative mood.
+
+```
 
 ## A shadowed name is reported
 
@@ -49,14 +86,17 @@ not behave the way its file reads.
 
 A skill declares the skills it needs:
 
-```yaml
+```markdown {filename="skills/reviewing/SKILL.md"}
 ---
 name: reviewing
 description: My review process.
 requires:
   - shared:testing
   - writing
+  - shared:linting
 ---
+
+Run the tests, then read the diff.
 ```
 
 An entry with no alias names a skill in the same library. An entry with
@@ -67,7 +107,17 @@ declares that alias. An entry that holds a colon for another reason
 therefore keeps its meaning.
 
 `almanac check` reports an entry that names no skill, and an entry that
-uses an alias that the library does not declare.
+uses an alias that the library does not declare. Here `shared` holds no
+`linting`, and `writing` is shadowed:
+
+```console
+$ almanac check
+? 1
+2 problem(s):
+  reviewing requires shared:linting, which names no skill
+  'writing' comes from (this library); also in shared
+
+```
 
 ## Remote libraries
 
@@ -104,11 +154,12 @@ follow.
 `almanac serve` offers this library over MCP, so a client reads it
 without a copy on disk.
 
-```sh
-almanac serve                                   # stdin and stdout
-almanac serve --bind 127.0.0.1:8931             # for clients that connect
-almanac serve --surfaces skills,resources,tools
-```
+- `almanac serve` speaks MCP on stdin and stdout, for a client that
+  starts the process.
+- `almanac serve --bind 127.0.0.1:8931` serves over HTTP at
+  `http://127.0.0.1:8931/mcp`, for a client that connects.
+- `almanac serve --surfaces skills,resources,tools` offers all three
+  surfaces.
 
 ### Surfaces
 

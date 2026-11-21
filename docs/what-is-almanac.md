@@ -41,9 +41,15 @@ Almanac vendors skills into the library from three kinds of source:
 ## How agents use it
 
 Print a markdown index and inject it into agent context at session
-start:
+start. In a library with two skills:
 
-    almanac index --md --max-bytes 4096
+```console
+$ almanac index --md --max-bytes 4096
+Available skills (show with `almanac show <name>`):
+- **reviewing** — How to review a pull request.
+- **writing** — How to write a commit message.
+
+```
 
 The agent then loads one skill with `almanac show <name>`, or it reads
 the SKILL.md file directly. A context-lifecycle tool such as
@@ -54,7 +60,7 @@ session on a cadence.
 
 Each skill lives in its own directory with a `SKILL.md` entry point:
 
-```
+```text
 my-skill/
 ├── SKILL.md           # Required. Instructions with YAML frontmatter.
 └── ...                # Supporting files. The agent reads them on demand.

@@ -13,15 +13,23 @@ pub const ABOUT: &str = "Almanac curates agent skills and indexes them for agent
 #[derive(Parser)]
 #[command(name = "almanac", version, about = ABOUT, max_term_width = 98)]
 pub struct Args {
-    /// Library directory. Literal: the directory must hold almanac.yml;
-    /// no walk, no fallback. Without it, the nearest almanac.yml at or
-    /// above the cwd is used. With none, reads use the configured root
-    /// library and a write needs --home.
+    // Handler: run (src/cli.rs), and mdstore::resolve::resolve_root.
+    /// Library directory, taken literally
+    ///
+    /// The directory must hold almanac.yml: no walk, and no fallback.
+    /// Without --root, the nearest almanac.yml at or above the working
+    /// directory is used. With none, a read uses the configured root
+    /// library and a write needs --home. init creates its manifest in
+    /// this directory.
     #[arg(long, global = true)]
     pub root: Option<std::path::PathBuf>,
 
+    // Handler: run (src/cli.rs), and mdstore::resolve::resolve_root.
     /// Act on the configured root library (`almanac store root`),
-    /// wherever the command runs.
+    /// wherever the command runs
+    ///
+    /// A command that resolves no library refuses it: init, prime, docs,
+    /// store root, and list, show, or index with --source.
     #[arg(long, global = true, conflicts_with = "root")]
     pub home: bool,
 
@@ -94,98 +102,222 @@ pub enum Command {
         shell: clap_complete::Shell,
     },
 
-    /// Create an almanac.yml manifest that governs a library directory.
+    // Handler: run_command, Command::Init (src/cli.rs), and init
+    // (src/ops.rs).
+    /// Create an almanac.yml manifest that governs a library directory
+    ///
+    /// Writes almanac.yml in the working directory, or in the --root
+    /// directory, and creates the library directory beside it. Fails
+    /// when almanac.yml already exists.
     Init {
-        /// Library directory, relative to the manifest.
+        /// Library directory, relative to the manifest
         #[arg(long, default_value = "skills")]
         library: String,
     },
-    /// Fetch a skill, print its red-flag report, and vendor it with --accept.
+
+    // Handler: run_command, Command::Add (src/cli.rs), and add
+    // (src/ops.rs).
+    /// Fetch a skill, print its red-flag report, and vendor it with --accept
+    ///
+    /// Without --accept, nothing lands in the library: a git source is
+    /// copied to .almanac-staged/<name>/ for inspection, a dev source is
+    /// read in place, and the command exits 1. With --accept, the skill
+    /// is copied into the library with an .almanac-origin stamp, and its
+    /// entry is pinned in almanac.yml to a commit (git sources) and a
+    /// content hash.
+    ///
+    /// A git source resolves --ref, or the default branch, to a commit
+    /// unless --rev names one. A local repository is read in place; a
+    /// remote one is fetched over http, https, or git://. ssh is
+    /// refused.
     Add {
-        /// github:owner/repo, owner/repo, git:<url>, or dev:<path>.
+        /// github:owner/repo, owner/repo, git:<url>, or dev:<path>
         source: String,
-        /// Manifest name. Must match the SKILL.md frontmatter name.
+        /// Manifest name. Must match the SKILL.md frontmatter name
         #[arg(long)]
         name: Option<String>,
-        /// Skill directory within the source.
+        /// Skill directory within the source
         #[arg(long)]
         path: Option<String>,
-        /// Branch or tag to resolve.
+        /// Branch or tag to resolve
         #[arg(long = "ref")]
         r#ref: Option<String>,
-        /// Exact commit to pin.
+        /// Exact commit to pin
         #[arg(long)]
         rev: Option<String>,
-        /// Accept the staged content into the library. Trust on first use.
+        /// Accept the staged content into the library. Trust on first use
         #[arg(long)]
         accept: bool,
     },
-    /// Write every pinned entry to disk. --check verifies instead, and exits 1 on drift.
+
+    // Handler: run_command, Command::Sync (src/cli.rs), and sync
+    // (src/ops.rs).
+    /// Write every pinned entry to disk
+    ///
+    /// Prints one line for each entry: `ok` for a clean entry, `synced`
+    /// for an entry fetched again at its pin, `skip` for a dev: snapshot,
+    /// and `FAIL` when the fetched content does not match the pinned
+    /// hash. A failed entry leaves the library as it is, and the command
+    /// exits 1.
     Sync {
+        /// Verify instead of writing: `FAIL` for an entry that is drifted,
+        /// missing, or unreadable, and exit 1
         #[arg(long)]
         check: bool,
     },
-    /// Fetch upstream, print the red flags and the diff, then re-pin with --yes.
+
+    // Handler: run_command, Command::Update (src/cli.rs), and update
+    // (src/ops.rs).
+    /// Fetch upstream, print the red flags and the diff, then re-pin with --yes
+    ///
+    /// Resolves each entry's recorded ref again. An entry already at that
+    /// commit prints `up-to-date`, and a dev: entry prints `skip`.
+    /// Without --yes, nothing changes.
     Update {
-        /// Entry names. Defaults to every git-sourced entry.
+        /// Entry names. Defaults to every entry
         names: Vec<String>,
+        /// Apply the update and re-pin
         #[arg(long, short = 'y')]
         yes: bool,
     },
-    /// Remove an entry and its vendored directory. Refuses an unmanaged directory.
-    Remove { name: String },
-    /// Print every manifest entry with its pin and drift state, then the unmanaged neighbors.
+
+    // Handler: run_command, Command::Remove (src/cli.rs), and remove
+    // (src/ops.rs).
+    /// Remove an entry and its vendored directory. Refuses an unmanaged directory
+    ///
+    /// A directory without an .almanac-origin stamp is unmanaged, and
+    /// almanac does not delete it.
+    Remove {
+        /// The entry name
+        name: String,
+    },
+
+    // Handler: run_command, Command::Status (src/cli.rs), and list
+    // (src/ops.rs).
+    /// Print every manifest entry with its pin and drift state, then the unmanaged neighbors
+    ///
+    /// Each entry prints its name, the first nine characters of its
+    /// commit (`-` for a dev: snapshot), its state, and its source. The
+    /// state is `clean`, `drifted`, `missing`, or `unreadable`. A
+    /// directory in the library that has no .almanac-origin stamp and no
+    /// entry follows, marked `unmanaged`.
     Status,
-    /// List the available skills with name, description, and source.
+
+    // Handler: run_command, Command::List (src/cli.rs), cmd_list and
+    // reachable_skills (src/cli.rs).
+    /// List the available skills with name, description, and source
+    ///
+    /// Covers this library and the libraries it declares in stores.yml,
+    /// then each --source directory. A name that two libraries hold
+    /// prints once, from the library that wins it.
     List {
-        /// Skill source directories (repeatable).
+        /// Skill source directory. Repeatable
         #[arg(long = "source", short = 's')]
         sources: Vec<String>,
     },
+
+    // Handler: run_command, Command::Show (src/cli.rs), cmd_show
+    // (src/cli.rs), and show_captured (src/skill.rs).
     /// Print the full SKILL.md content of one skill, after a line that
-    /// names the skill's directory.
+    /// names the skill's directory
+    ///
+    /// The first line names the absolute directory that holds the
+    /// SKILL.md, so a relative path in the skill body resolves against
+    /// it. A skill from a library that lives in git has no directory on
+    /// this machine, and prints without that line. A skill directory
+    /// with a references/ directory ends with a `## References` section,
+    /// one `almanac show` command for each file. `almanac show
+    /// <name>/references/<file>` prints one reference file. Exits 1 when
+    /// the skill is not found.
     Show {
-        /// The skill name to print.
+        /// The skill name to print
         name: String,
 
-        /// Skill source directories (repeatable).
+        /// Skill source directory. Repeatable
         #[arg(long = "source", short = 's')]
         sources: Vec<String>,
     },
-    /// Print a JSON index of the available skills.
+
+    // Handler: run_command, Command::Index (src/cli.rs), cmd_index
+    // (src/cli.rs), and format_index_md (src/ops.rs).
+    /// Print a JSON index of the available skills
+    ///
+    /// The JSON is one array, with a `name`, `description`, and `source`
+    /// for each skill. The skills are the ones `almanac list` prints.
     Index {
-        /// Skill source directories (repeatable).
+        /// Skill source directory. Repeatable
         #[arg(long = "source", short = 's')]
         sources: Vec<String>,
-        /// Print a markdown skills index for an agent's context.
+        /// Print a markdown skills index for an agent's context
+        ///
+        /// Its header names the command that loads a skill, with --home
+        /// when --home chose the library.
         #[arg(long)]
         md: bool,
-        /// Byte budget for --md. The output degrades to name-only
-        /// lines, then to a truncation note.
+        /// Byte budget for --md
+        ///
+        /// The output degrades to name-only lines, then to a truncation
+        /// note.
         #[arg(long, default_value_t = 4096)]
         max_bytes: usize,
     },
-    /// Manage the declared libraries.
+
+    // Handler: cmd_store and run_store_root (src/cli.rs).
+    /// Manage the declared libraries
     #[command(subcommand)]
     Store(StoreCommand),
-    /// Check the libraries for dangling requirements and store problems.
+
+    // Handler: cmd_check (src/cli.rs), and Workspace::check
+    // (src/workspace.rs).
+    /// Check the libraries for dangling requirements and store problems
+    ///
+    /// Reports a requires: entry that names no skill, a skill name that
+    /// two libraries hold (the library that wins and each that loses), a
+    /// declared library that is not available or cannot be followed, a
+    /// file beside a SKILL.md that cannot be read, and, in a library
+    /// with `shared: true`, a declaration that another clone cannot
+    /// follow. Prints `no problems found`, or the count and one line for
+    /// each problem and exits 1.
     Check,
-    /// Serve this library over MCP.
+
+    // Handler: cmd_serve (src/cli.rs), and run (src/serve.rs).
+    /// Serve this library over MCP
+    ///
+    /// The server is read-only, and no flag changes that. It has no
+    /// authentication: bind it to 127.0.0.1, or put a proxy that
+    /// authenticates in front of it. Tools: `almanac_list_skills`,
+    /// `almanac_get_skill`, and `almanac_check`. Resources:
+    /// `skill://<name>/SKILL.md` and `skill://<name>/references/<file>`.
     Serve {
         /// The surfaces to offer, separated by commas: skills,
-        /// resources, tools. Tools are the surface every client can
-        /// call, so a default keeps them on.
+        /// resources, tools
+        ///
+        /// Tools are the surface every client can call, so the default
+        /// keeps them on.
         #[arg(long, default_value = "skills,tools")]
         surfaces: String,
-        /// Where to listen. Omitted, the server speaks on stdin and
-        /// stdout, for a client that starts it as a child process.
-        /// Given, it serves over HTTP for a client that connects to it.
+        /// Where to listen, as host:port
+        ///
+        /// Omitted, the server speaks on stdin and stdout, for a client
+        /// that starts it as a child process. Given, it serves over HTTP
+        /// at /mcp, for a client that connects to it.
         #[arg(long)]
         bind: Option<String>,
     },
-    /// Print what almanac is and how to use it, for an agent's context.
+
+    // Handler: run_command, Command::Prime, and prime (src/cli.rs).
+    /// Print what almanac is and how to use it, for an agent's context
+    ///
+    /// The output depends only on the binary version: no argument,
+    /// config, or library changes it. When an agent reads it is the
+    /// caller's choice.
     Prime,
-    /// Browse bundled documentation.
+
+    // Handler: cmd_docs (src/cli.rs), and diataxis::DocSet::render.
+    /// Browse bundled documentation
+    ///
+    /// Without a topic, lists the pages and their slugs. A topic is a
+    /// slug, a title, or a unique prefix of one.
     Docs(diataxis::DocsArgs),
 }
 
@@ -406,20 +538,41 @@ fn cmd_serve(root: &Path, surfaces: &str, bind: Option<&str>) -> Result<(), Erro
 /// The library subcommands.
 #[derive(clap::Subcommand, Clone)]
 pub enum StoreCommand {
-    /// List the libraries this library reads, in precedence order.
+    // Handler: cmd_store, StoreCommand::List (src/cli.rs), and
+    // Workspace::store_members (src/workspace.rs).
+    /// List the libraries this library reads, in precedence order
+    ///
+    /// The first row is this library. Each other row is a declared
+    /// library: its alias, its source, and its skill count, or why it is
+    /// unavailable. A library that lives in git also shows the age of
+    /// its cache.
     List,
-    /// Fetch the declared remote libraries into the local cache.
+    // Handler: cmd_store, StoreCommand::Sync (src/cli.rs), and
+    // Workspace::sync_all (src/workspace.rs).
+    /// Fetch the declared remote libraries into the local cache
+    ///
+    /// Prints `synced` or `failed` for each library that lives in git or
+    /// at a blob URL, and exits 1 when any fails. Along with add, update,
+    /// and sync, this is one of four commands that reach the network.
     Sync,
-    /// Show or set the root library that reads fall back to.
+    // Handler: run_store_root (src/cli.rs).
+    /// Show or set the root library that reads fall back to
+    ///
+    /// The setting lives in ~/.config/almanac/config.yml, and the home
+    /// directory comes from the passwd database, not $HOME. The path must
+    /// hold almanac.yml. Each tool keeps its own setting, so a repository
+    /// that also holds tisket.yml and zettel.yml can be the root for
+    /// each of the three. A note on stderr names either file when it is
+    /// missing.
     Root(StoreRootArgs),
 }
 
 #[derive(clap::Args, Clone)]
 pub struct StoreRootArgs {
     /// The directory of the root library. Without it, print the
-    /// current setting.
+    /// current setting
     pub path: Option<std::path::PathBuf>,
-    /// Replace an already-set root with a different one.
+    /// Replace an already-set root with a different one
     #[arg(long)]
     pub force: bool,
 }

@@ -113,7 +113,9 @@ gix = { version = "0.87", default-features = false, features = [
 
 diataxis = { version = "0.1", default-features = false, features = ["cli"] }
 [dev-dependencies]
+snapbox = "1.2"
 tempfile = "3.26.0"
+trycmd = "1.2"
 
 # The docs pages are generated at build time from the same
 # documentation set the `docs` subcommand reads.
