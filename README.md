@@ -160,14 +160,15 @@ stores:
 A skill name is the identity, and two libraries can hold the same name.
 The nearer library wins: this library first, then each declared library
 in declaration order. `list` and `index` give the winner, so the list
-shows what an agent loads. `show` gives the winner too, except against
-a library declared with `git:`. `show` reads every skill directory on
-this machine first: this library, each `path:` library, and each
-`--source` directory. So when a `git:` library wins a name that one of
-those directories also holds, `show` prints the directory's copy.
+shows what an agent loads. `show` reads the library directories on
+this machine first (this library, each `path:` library, and each
+`--source` directory) and a `git:` library after them. When a `git:`
+library wins a name that one of those directories also holds, `show`
+prints the directory's copy.
 
-A skill that loses a name stays on disk. `almanac check` reports every
-shadowed name and the library it came from.
+A skill that loses a name stays on disk. `almanac check` reports each
+name that this library and the libraries it declares both hold, and the
+library that wins it. It does not read `--source` directories.
 
 A skill declares the skills it needs:
 
