@@ -35,7 +35,8 @@ Almanac vendors skills into the library from three kinds of source:
 
 - `github:owner/repo`: a GitHub repository, pinned to a commit and a
   content hash.
-- `git:<url>`: any git server over https, pinned the same way.
+- `git:<url>`: any git server over http, https, or git://, or a local
+  repository, pinned the same way.
 - `dev:<path>`: a local snapshot of a skill you develop alongside.
 
 ## How agents use it
@@ -68,5 +69,6 @@ my-skill/
 
 The agentskills.io spec requires `name` and `description` in the
 frontmatter. The `name` uses lowercase letters, digits, and hyphens, it
-matches the directory name, and it is 64 characters or shorter. Almanac
-uses the directory name when `name` is absent.
+matches the directory name, and it is 64 characters or shorter. `list`,
+`show`, and `index` use the directory name when `name` is absent.
+`almanac add` requires `name`, and refuses a SKILL.md without it.

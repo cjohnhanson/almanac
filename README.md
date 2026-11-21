@@ -138,7 +138,8 @@ use it, for an agent's context; it depends only on the binary version.
   in-process on gix. No git program runs. An ssh URL is refused,
   because gix would spawn ssh for it.
 - `dev:<path>`: a local snapshot of a skill you develop alongside.
-  `sync --check` skips it and reports drift as information.
+  `sync --check` skips it whatever its state. `status` shows its drift,
+  and `sync` names the drift and leaves the snapshot as it is.
 
 ## Composed libraries
 
@@ -175,8 +176,8 @@ requires:
 ```
 
 An entry with no alias names a skill in the same library. `almanac
-check` reports an entry that names no skill, and an entry that uses an
-alias the library does not declare.
+check` reports an entry that names no skill. An entry whose prefix is
+not a declared alias is read as a plain name, and reported the same way.
 
 `almanac store list` shows the libraries and their skill counts.
 `almanac store sync` fetches the remote ones into a local cache. Four
@@ -197,7 +198,9 @@ configuration: `--surfaces skills,resources,tools`. The default is
 `skills,tools`, because every client can call a tool. A served library
 is read-only, and no flag changes that: curating a skill is a decision
 a person makes at the command line. It also has no authentication, so
-bind it to `127.0.0.1` or put an authenticating proxy in front.
+bind it to `127.0.0.1` or put an authenticating proxy in front. `serve`
+picks its library as a write does, so it never falls back to the root
+library.
 
 Read `almanac docs composition` for the model.
 
@@ -205,6 +208,7 @@ Read `almanac docs composition` for the model.
 
 - [What is Almanac?](docs/what-is-almanac.md): skill format, sources, design
 - [Curation and pinning](docs/curation.md): the manifest workflow and the trust model
+- [Composed libraries](docs/composition.md): declaring other libraries, precedence, requirements, and serving
 - [CLI reference](docs/cli-reference.md): every command and flag
 
 ## Related

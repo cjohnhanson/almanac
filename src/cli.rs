@@ -14,13 +14,13 @@ pub const ABOUT: &str = "Almanac curates agent skills and indexes them for agent
 #[command(name = "almanac", version, about = ABOUT, max_term_width = 98)]
 pub struct Args {
     // Handler: run (src/cli.rs), and mdstore::resolve::resolve_root.
-    /// Library directory, taken literally
+    /// Directory that holds almanac.yml, taken literally
     ///
-    /// The directory must hold almanac.yml: no walk, and no fallback.
-    /// Without --root, the nearest almanac.yml at or above the working
-    /// directory is used. With none, a read uses the configured root
-    /// library and a write needs --home. init creates its manifest in
-    /// this directory.
+    /// No walk, and no fallback. Without --root, the nearest almanac.yml
+    /// at or above the working directory is used. With none, a read uses
+    /// the configured root library and a write needs --home. init
+    /// creates almanac.yml in this directory, and the skills directory
+    /// (--library) inside it.
     #[arg(long, global = true)]
     pub root: Option<std::path::PathBuf>,
 
@@ -136,7 +136,8 @@ pub enum Command {
         /// Manifest name. Must match the SKILL.md frontmatter name
         #[arg(long)]
         name: Option<String>,
-        /// Skill directory within the source
+        /// Skill directory within a git source. A dev: source names the
+        /// skill directory itself
         #[arg(long)]
         path: Option<String>,
         /// Branch or tag to resolve
@@ -154,14 +155,15 @@ pub enum Command {
     // (src/ops.rs).
     /// Write every pinned entry to disk
     ///
-    /// Prints one line for each entry: `ok` for a clean entry, `synced`
-    /// for an entry fetched again at its pin, `skip` for a dev: snapshot,
-    /// and `FAIL` when the fetched content does not match the pinned
-    /// hash. A failed entry leaves the library as it is, and the command
-    /// exits 1.
+    /// Prints one line for each entry. A clean entry prints `ok`. An
+    /// entry fetched again at its pin prints `synced`. A dev: snapshot
+    /// that is not clean prints `skip` and is left as it is. An entry
+    /// whose fetched content does not match the pinned hash prints
+    /// `FAIL`; the library keeps its copy, and the command exits 1.
     Sync {
         /// Verify instead of writing: `FAIL` for an entry that is drifted,
-        /// missing, or unreadable, and exit 1
+        /// missing, or unreadable, and exit 1. A dev: snapshot prints
+        /// `skip` whatever its state
         #[arg(long)]
         check: bool,
     },
@@ -175,6 +177,9 @@ pub enum Command {
     /// Without --yes, nothing changes.
     Update {
         /// Entry names. Defaults to every entry
+        ///
+        /// A name that matches no entry is ignored while another name
+        /// matches one; when none match, the command fails.
         names: Vec<String>,
         /// Apply the update and re-pin
         #[arg(long, short = 'y')]
@@ -271,13 +276,26 @@ pub enum Command {
     // (src/workspace.rs).
     /// Check the libraries for dangling requirements and store problems
     ///
-    /// Reports a requires: entry that names no skill, a skill name that
-    /// two libraries hold (the library that wins and each that loses), a
-    /// declared library that is not available or cannot be followed, a
-    /// file beside a SKILL.md that cannot be read, and, in a library
-    /// with `shared: true`, a declaration that another clone cannot
-    /// follow. Prints `no problems found`, or the count and one line for
-    /// each problem and exits 1.
+    /// Reports each of these:
+    ///
+    /// - a requires: entry that names no skill
+    ///
+    /// - a skill name that two libraries hold, with the library that
+    ///   wins and each that loses
+    ///
+    /// - a declared library that is not available, or a stores.yml
+    ///   declaration that cannot be followed
+    ///
+    /// - a file the scan skipped, such as a SKILL.md that cannot be
+    ///   parsed, or a library that could not be loaded
+    ///
+    /// - a file beside a SKILL.md that cannot be read
+    ///
+    /// - in a library with `shared: true`, a declaration that another
+    ///   clone cannot follow
+    ///
+    /// With no problem, prints `no problems found` and exits 0. Otherwise
+    /// prints the count and one line for each problem, and exits 1.
     Check,
 
     // Handler: cmd_serve (src/cli.rs), and run (src/serve.rs).
@@ -285,7 +303,9 @@ pub enum Command {
     ///
     /// The server is read-only, and no flag changes that. It has no
     /// authentication: bind it to 127.0.0.1, or put a proxy that
-    /// authenticates in front of it. Tools: `almanac_list_skills`,
+    /// authenticates in front of it. The library is chosen as for a
+    /// write, so serve never falls back to the root library, and it
+    /// names a library it found above the working directory. Tools: `almanac_list_skills`,
     /// `almanac_get_skill`, and `almanac_check`. Resources:
     /// `skill://<name>/SKILL.md` and `skill://<name>/references/<file>`.
     Serve {
@@ -544,8 +564,9 @@ pub enum StoreCommand {
     ///
     /// The first row is this library. Each other row is a declared
     /// library: its alias, its source, and its skill count, or why it is
-    /// unavailable. A library that lives in git also shows the age of
-    /// its cache.
+    /// unavailable. A library that a declared library declares follows
+    /// it, under an alias path such as `shared/deep`. A library that
+    /// lives in git also shows the age of its cache.
     List,
     // Handler: cmd_store, StoreCommand::Sync (src/cli.rs), and
     // Workspace::sync_all (src/workspace.rs).

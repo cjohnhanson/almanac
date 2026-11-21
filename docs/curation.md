@@ -134,7 +134,8 @@ manifest and the content live in the same repo.
 - `git:<url>`: any http, https, git://, or local git URL, pinned the
   same way. ssh is refused, because almanac spawns no ssh process.
 - `dev:<path>`: a local snapshot of a skill you develop alongside.
-  `sync --check` skips it and reports drift as information.
+  `sync --check` skips it whatever its state. `status` shows its drift,
+  and `sync` names the drift and leaves the snapshot as it is.
 
 Almanac reads a local repository in place. To fetch a pinned commit
 from a server, almanac tries a direct sha fetch, then the recorded ref,

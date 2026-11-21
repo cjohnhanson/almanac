@@ -106,9 +106,10 @@ The text before the first colon is an alias only when the library
 declares that alias. An entry that holds a colon for another reason
 therefore keeps its meaning.
 
-`almanac check` reports an entry that names no skill, and an entry that
-uses an alias that the library does not declare. Here `shared` holds no
-`linting`, and `writing` is shadowed:
+`almanac check` reports an entry that names no skill. An entry whose
+prefix is not a declared alias is read as a plain name, so it is
+reported the same way. Here `shared` holds no `linting`, and `writing`
+is shadowed:
 
 ```console
 $ almanac check
@@ -122,9 +123,10 @@ $ almanac check
 ## Remote libraries
 
 `almanac store sync` fetches each declared remote library into a local
-cache. Four commands reach the network: `add` and `update` fetch a
-pinned commit for one entry, `sync` refetches an entry that is missing
-or drifted, and `store sync` fills the cache for a declared library.
+cache. Four commands reach the network. `add` fetches one skill at the
+commit it pins. `update` resolves each entry's ref again and fetches
+the new commit. `sync` refetches an entry that is missing, drifted, or
+unreadable, and `store sync` fills the cache for a declared library.
 Every other command reads what is already vendored or cached, so an
 answer never changes because of a fetch nobody asked for.
 
@@ -205,3 +207,9 @@ that write are the curation commands. `add` fetches a skill and prints
 its red-flag report, and `--accept` vendors it and pins the content.
 That decision belongs to a person at the command line. A remote caller
 reads what the library already holds.
+
+`serve` picks its library as a write does, although it changes nothing.
+A served library must never rest on a fallback its clients cannot see,
+so `serve` needs a library at or above the working directory, `--root`,
+or `--home`, and it names a library it found above the working
+directory on stderr.

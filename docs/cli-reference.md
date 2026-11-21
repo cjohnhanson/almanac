@@ -38,12 +38,12 @@ Commands:
 
 Options:
       --root <ROOT>
-          Library directory, taken literally
+          Directory that holds almanac.yml, taken literally
           
-          The directory must hold almanac.yml: no walk, and no fallback. Without --root, the
-          nearest almanac.yml at or above the working directory is used. With none, a read uses
-          the configured root library and a write needs --home. init creates its manifest in this
-          directory.
+          No walk, and no fallback. Without --root, the nearest almanac.yml at or above the
+          working directory is used. With none, a read uses the configured root library and a
+          write needs --home. init creates almanac.yml in this directory, and the skills directory
+          (--library) inside it.
 
       --home
           Act on the configured root library (`almanac store root`), wherever the command runs
@@ -75,12 +75,12 @@ Options:
           [default: skills]
 
       --root <ROOT>
-          Library directory, taken literally
+          Directory that holds almanac.yml, taken literally
           
-          The directory must hold almanac.yml: no walk, and no fallback. Without --root, the
-          nearest almanac.yml at or above the working directory is used. With none, a read uses
-          the configured root library and a write needs --home. init creates its manifest in this
-          directory.
+          No walk, and no fallback. Without --root, the nearest almanac.yml at or above the
+          working directory is used. With none, a read uses the configured root library and a
+          write needs --home. init creates almanac.yml in this directory, and the skills directory
+          (--library) inside it.
 
       --home
           Act on the configured root library (`almanac store root`), wherever the command runs
@@ -116,12 +116,12 @@ Options:
           Manifest name. Must match the SKILL.md frontmatter name
 
       --root <ROOT>
-          Library directory, taken literally
+          Directory that holds almanac.yml, taken literally
           
-          The directory must hold almanac.yml: no walk, and no fallback. Without --root, the
-          nearest almanac.yml at or above the working directory is used. With none, a read uses
-          the configured root library and a write needs --home. init creates its manifest in this
-          directory.
+          No walk, and no fallback. Without --root, the nearest almanac.yml at or above the
+          working directory is used. With none, a read uses the configured root library and a
+          write needs --home. init creates almanac.yml in this directory, and the skills directory
+          (--library) inside it.
 
       --home
           Act on the configured root library (`almanac store root`), wherever the command runs
@@ -130,7 +130,7 @@ Options:
           show, or index with --source.
 
       --path <PATH>
-          Skill directory within the source
+          Skill directory within a git source. A dev: source names the skill directory itself
 
       --ref <REF>
           Branch or tag to resolve
@@ -150,24 +150,25 @@ Options:
 ```text
 Write every pinned entry to disk
 
-Prints one line for each entry: `ok` for a clean entry, `synced` for an entry fetched again at its
-pin, `skip` for a dev: snapshot, and `FAIL` when the fetched content does not match the pinned
-hash. A failed entry leaves the library as it is, and the command exits 1.
+Prints one line for each entry. A clean entry prints `ok`. An entry fetched again at its pin
+prints `synced`. A dev: snapshot that is not clean prints `skip` and is left as it is. An entry
+whose fetched content does not match the pinned hash prints `FAIL`; the library keeps its copy,
+and the command exits 1.
 
 Usage: almanac sync [OPTIONS]
 
 Options:
       --check
           Verify instead of writing: `FAIL` for an entry that is drifted, missing, or unreadable,
-          and exit 1
+          and exit 1. A dev: snapshot prints `skip` whatever its state
 
       --root <ROOT>
-          Library directory, taken literally
+          Directory that holds almanac.yml, taken literally
           
-          The directory must hold almanac.yml: no walk, and no fallback. Without --root, the
-          nearest almanac.yml at or above the working directory is used. With none, a read uses
-          the configured root library and a write needs --home. init creates its manifest in this
-          directory.
+          No walk, and no fallback. Without --root, the nearest almanac.yml at or above the
+          working directory is used. With none, a read uses the configured root library and a
+          write needs --home. init creates almanac.yml in this directory, and the skills directory
+          (--library) inside it.
 
       --home
           Act on the configured root library (`almanac store root`), wherever the command runs
@@ -192,15 +193,18 @@ Usage: almanac update [OPTIONS] [NAMES]...
 Arguments:
   [NAMES]...
           Entry names. Defaults to every entry
+          
+          A name that matches no entry is ignored while another name matches one; when none match,
+          the command fails.
 
 Options:
       --root <ROOT>
-          Library directory, taken literally
+          Directory that holds almanac.yml, taken literally
           
-          The directory must hold almanac.yml: no walk, and no fallback. Without --root, the
-          nearest almanac.yml at or above the working directory is used. With none, a read uses
-          the configured root library and a write needs --home. init creates its manifest in this
-          directory.
+          No walk, and no fallback. Without --root, the nearest almanac.yml at or above the
+          working directory is used. With none, a read uses the configured root library and a
+          write needs --home. init creates almanac.yml in this directory, and the skills directory
+          (--library) inside it.
 
   -y, --yes
           Apply the update and re-pin
@@ -230,12 +234,12 @@ Arguments:
 
 Options:
       --root <ROOT>
-          Library directory, taken literally
+          Directory that holds almanac.yml, taken literally
           
-          The directory must hold almanac.yml: no walk, and no fallback. Without --root, the
-          nearest almanac.yml at or above the working directory is used. With none, a read uses
-          the configured root library and a write needs --home. init creates its manifest in this
-          directory.
+          No walk, and no fallback. Without --root, the nearest almanac.yml at or above the
+          working directory is used. With none, a read uses the configured root library and a
+          write needs --home. init creates almanac.yml in this directory, and the skills directory
+          (--library) inside it.
 
       --home
           Act on the configured root library (`almanac store root`), wherever the command runs
@@ -260,12 +264,12 @@ Usage: almanac status [OPTIONS]
 
 Options:
       --root <ROOT>
-          Library directory, taken literally
+          Directory that holds almanac.yml, taken literally
           
-          The directory must hold almanac.yml: no walk, and no fallback. Without --root, the
-          nearest almanac.yml at or above the working directory is used. With none, a read uses
-          the configured root library and a write needs --home. init creates its manifest in this
-          directory.
+          No walk, and no fallback. Without --root, the nearest almanac.yml at or above the
+          working directory is used. With none, a read uses the configured root library and a
+          write needs --home. init creates almanac.yml in this directory, and the skills directory
+          (--library) inside it.
 
       --home
           Act on the configured root library (`almanac store root`), wherever the command runs
@@ -289,12 +293,12 @@ Usage: almanac list [OPTIONS]
 
 Options:
       --root <ROOT>
-          Library directory, taken literally
+          Directory that holds almanac.yml, taken literally
           
-          The directory must hold almanac.yml: no walk, and no fallback. Without --root, the
-          nearest almanac.yml at or above the working directory is used. With none, a read uses
-          the configured root library and a write needs --home. init creates its manifest in this
-          directory.
+          No walk, and no fallback. Without --root, the nearest almanac.yml at or above the
+          working directory is used. With none, a read uses the configured root library and a
+          write needs --home. init creates almanac.yml in this directory, and the skills directory
+          (--library) inside it.
 
   -s, --source <SOURCES>
           Skill source directory. Repeatable
@@ -328,12 +332,12 @@ Arguments:
 
 Options:
       --root <ROOT>
-          Library directory, taken literally
+          Directory that holds almanac.yml, taken literally
           
-          The directory must hold almanac.yml: no walk, and no fallback. Without --root, the
-          nearest almanac.yml at or above the working directory is used. With none, a read uses
-          the configured root library and a write needs --home. init creates its manifest in this
-          directory.
+          No walk, and no fallback. Without --root, the nearest almanac.yml at or above the
+          working directory is used. With none, a read uses the configured root library and a
+          write needs --home. init creates almanac.yml in this directory, and the skills directory
+          (--library) inside it.
 
   -s, --source <SOURCES>
           Skill source directory. Repeatable
@@ -360,12 +364,12 @@ Usage: almanac index [OPTIONS]
 
 Options:
       --root <ROOT>
-          Library directory, taken literally
+          Directory that holds almanac.yml, taken literally
           
-          The directory must hold almanac.yml: no walk, and no fallback. Without --root, the
-          nearest almanac.yml at or above the working directory is used. With none, a read uses
-          the configured root library and a write needs --home. init creates its manifest in this
-          directory.
+          No walk, and no fallback. Without --root, the nearest almanac.yml at or above the
+          working directory is used. With none, a read uses the configured root library and a
+          write needs --home. init creates almanac.yml in this directory, and the skills directory
+          (--library) inside it.
 
   -s, --source <SOURCES>
           Skill source directory. Repeatable
@@ -408,12 +412,12 @@ Commands:
 
 Options:
       --root <ROOT>
-          Library directory, taken literally
+          Directory that holds almanac.yml, taken literally
           
-          The directory must hold almanac.yml: no walk, and no fallback. Without --root, the
-          nearest almanac.yml at or above the working directory is used. With none, a read uses
-          the configured root library and a write needs --home. init creates its manifest in this
-          directory.
+          No walk, and no fallback. Without --root, the nearest almanac.yml at or above the
+          working directory is used. With none, a read uses the configured root library and a
+          write needs --home. init creates almanac.yml in this directory, and the skills directory
+          (--library) inside it.
 
       --home
           Act on the configured root library (`almanac store root`), wherever the command runs
@@ -431,19 +435,20 @@ Options:
 List the libraries this library reads, in precedence order
 
 The first row is this library. Each other row is a declared library: its alias, its source, and
-its skill count, or why it is unavailable. A library that lives in git also shows the age of its
+its skill count, or why it is unavailable. A library that a declared library declares follows it,
+under an alias path such as `shared/deep`. A library that lives in git also shows the age of its
 cache.
 
 Usage: almanac store list [OPTIONS]
 
 Options:
       --root <ROOT>
-          Library directory, taken literally
+          Directory that holds almanac.yml, taken literally
           
-          The directory must hold almanac.yml: no walk, and no fallback. Without --root, the
-          nearest almanac.yml at or above the working directory is used. With none, a read uses
-          the configured root library and a write needs --home. init creates its manifest in this
-          directory.
+          No walk, and no fallback. Without --root, the nearest almanac.yml at or above the
+          working directory is used. With none, a read uses the configured root library and a
+          write needs --home. init creates almanac.yml in this directory, and the skills directory
+          (--library) inside it.
 
       --home
           Act on the configured root library (`almanac store root`), wherever the command runs
@@ -467,12 +472,12 @@ Usage: almanac store sync [OPTIONS]
 
 Options:
       --root <ROOT>
-          Library directory, taken literally
+          Directory that holds almanac.yml, taken literally
           
-          The directory must hold almanac.yml: no walk, and no fallback. Without --root, the
-          nearest almanac.yml at or above the working directory is used. With none, a read uses
-          the configured root library and a write needs --home. init creates its manifest in this
-          directory.
+          No walk, and no fallback. Without --root, the nearest almanac.yml at or above the
+          working directory is used. With none, a read uses the configured root library and a
+          write needs --home. init creates almanac.yml in this directory, and the skills directory
+          (--library) inside it.
 
       --home
           Act on the configured root library (`almanac store root`), wherever the command runs
@@ -505,12 +510,12 @@ Options:
           Replace an already-set root with a different one
 
       --root <ROOT>
-          Library directory, taken literally
+          Directory that holds almanac.yml, taken literally
           
-          The directory must hold almanac.yml: no walk, and no fallback. Without --root, the
-          nearest almanac.yml at or above the working directory is used. With none, a read uses
-          the configured root library and a write needs --home. init creates its manifest in this
-          directory.
+          No walk, and no fallback. Without --root, the nearest almanac.yml at or above the
+          working directory is used. With none, a read uses the configured root library and a
+          write needs --home. init creates almanac.yml in this directory, and the skills directory
+          (--library) inside it.
 
       --home
           Act on the configured root library (`almanac store root`), wherever the command runs
@@ -527,22 +532,34 @@ Options:
 ```text
 Check the libraries for dangling requirements and store problems
 
-Reports a requires: entry that names no skill, a skill name that two libraries hold (the library
-that wins and each that loses), a declared library that is not available or cannot be followed, a
-file beside a SKILL.md that cannot be read, and, in a library with `shared: true`, a declaration
-that another clone cannot follow. Prints `no problems found`, or the count and one line for each
-problem and exits 1.
+Reports each of these:
+
+- a requires: entry that names no skill
+
+- a skill name that two libraries hold, with the library that wins and each that loses
+
+- a declared library that is not available, or a stores.yml declaration that cannot be followed
+
+- a file the scan skipped, such as a SKILL.md that cannot be parsed, or a library that could not
+be loaded
+
+- a file beside a SKILL.md that cannot be read
+
+- in a library with `shared: true`, a declaration that another clone cannot follow
+
+With no problem, prints `no problems found` and exits 0. Otherwise prints the count and one line
+for each problem, and exits 1.
 
 Usage: almanac check [OPTIONS]
 
 Options:
       --root <ROOT>
-          Library directory, taken literally
+          Directory that holds almanac.yml, taken literally
           
-          The directory must hold almanac.yml: no walk, and no fallback. Without --root, the
-          nearest almanac.yml at or above the working directory is used. With none, a read uses
-          the configured root library and a write needs --home. init creates its manifest in this
-          directory.
+          No walk, and no fallback. Without --root, the nearest almanac.yml at or above the
+          working directory is used. With none, a read uses the configured root library and a
+          write needs --home. init creates almanac.yml in this directory, and the skills directory
+          (--library) inside it.
 
       --home
           Act on the configured root library (`almanac store root`), wherever the command runs
@@ -560,20 +577,21 @@ Options:
 Serve this library over MCP
 
 The server is read-only, and no flag changes that. It has no authentication: bind it to 127.0.0.1,
-or put a proxy that authenticates in front of it. Tools: `almanac_list_skills`,
-`almanac_get_skill`, and `almanac_check`. Resources: `skill://<name>/SKILL.md` and
-`skill://<name>/references/<file>`.
+or put a proxy that authenticates in front of it. The library is chosen as for a write, so serve
+never falls back to the root library, and it names a library it found above the working directory.
+Tools: `almanac_list_skills`, `almanac_get_skill`, and `almanac_check`. Resources:
+`skill://<name>/SKILL.md` and `skill://<name>/references/<file>`.
 
 Usage: almanac serve [OPTIONS]
 
 Options:
       --root <ROOT>
-          Library directory, taken literally
+          Directory that holds almanac.yml, taken literally
           
-          The directory must hold almanac.yml: no walk, and no fallback. Without --root, the
-          nearest almanac.yml at or above the working directory is used. With none, a read uses
-          the configured root library and a write needs --home. init creates its manifest in this
-          directory.
+          No walk, and no fallback. Without --root, the nearest almanac.yml at or above the
+          working directory is used. With none, a read uses the configured root library and a
+          write needs --home. init creates almanac.yml in this directory, and the skills directory
+          (--library) inside it.
 
       --surfaces <SURFACES>
           The surfaces to offer, separated by commas: skills, resources, tools
@@ -610,12 +628,12 @@ Usage: almanac prime [OPTIONS]
 
 Options:
       --root <ROOT>
-          Library directory, taken literally
+          Directory that holds almanac.yml, taken literally
           
-          The directory must hold almanac.yml: no walk, and no fallback. Without --root, the
-          nearest almanac.yml at or above the working directory is used. With none, a read uses
-          the configured root library and a write needs --home. init creates its manifest in this
-          directory.
+          No walk, and no fallback. Without --root, the nearest almanac.yml at or above the
+          working directory is used. With none, a read uses the configured root library and a
+          write needs --home. init creates almanac.yml in this directory, and the skills directory
+          (--library) inside it.
 
       --home
           Act on the configured root library (`almanac store root`), wherever the command runs
@@ -649,12 +667,12 @@ Options:
           Print every page whole, in one stream
 
       --root <ROOT>
-          Library directory, taken literally
+          Directory that holds almanac.yml, taken literally
           
-          The directory must hold almanac.yml: no walk, and no fallback. Without --root, the
-          nearest almanac.yml at or above the working directory is used. With none, a read uses
-          the configured root library and a write needs --home. init creates its manifest in this
-          directory.
+          No walk, and no fallback. Without --root, the nearest almanac.yml at or above the
+          working directory is used. With none, a read uses the configured root library and a
+          write needs --home. init creates almanac.yml in this directory, and the skills directory
+          (--library) inside it.
 
       --home
           Act on the configured root library (`almanac store root`), wherever the command runs
@@ -678,6 +696,11 @@ not own, so a marker planted in a shared ancestor captures nothing.
 With no library found, a read falls back to the root library set in
 `~/.config/almanac/config.yml`, and it says so on stderr. A write never
 falls back. It fails and names `--home`.
+
+The writes are `add`, `sync` (with or without `--check`), `update`, `remove`, `store sync`, and
+`serve`. `serve` changes nothing, but a served library must never rest
+on a fallback its clients cannot see, so it resolves as a write. The
+reads are `list`, `show`, `index`, `status`, `check`, and `store list`.
 
 No environment variable takes part in the resolution. The config path
 is fixed, and the home directory comes from the passwd database rather

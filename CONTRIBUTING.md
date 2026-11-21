@@ -25,7 +25,10 @@ cargo install --locked --git https://github.com/cjohnhanson/gaff
 ```
 
 `node` drives the npm wrapper tests, `missouri` runs the state suite,
-and `gaff` runs the merge-gate tests.
+and `gaff` runs the merge-gate tests. The docs test (`tests/docs.rs`)
+needs `git` 2.28 or later, for `git init -b`, and the POSIX tools its
+pages run: `sh`, `env`, `printenv`, `mv`, `mkdir`, `cat`, `ls`, and
+`pwd`.
 
 ## Before a large change
 
@@ -100,7 +103,9 @@ run. No page reaches the network: a page that adds a skill adds it from
 a git repository its setup builds beside the working directory. A fence
 such as `` ```markdown {filename="skills/writing/SKILL.md"} `` is a file
 the reader writes; the test writes it before the commands that follow.
-Fixtures for a page live in `tests/docs/<page>/`.
+Fixtures for a page live in `tests/docs/<page>/`, and
+`tests/docs/user-config-fixture/` holds the fixtures of the test that
+proves no page reads the machine's user config.
 
 The test also compares the part of docs/cli-reference.md between its
 markers with the `--help` output of every command. Change help text in

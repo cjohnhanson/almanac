@@ -450,7 +450,11 @@ fn help(path: &[String]) -> String {
         .env("COLUMNS", COLUMNS)
         .output()
         .unwrap();
-    assert!(out.status.success(), "{path:?} --help failed");
+    assert!(
+        out.status.success(),
+        "{path:?} --help failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     String::from_utf8(out.stdout).unwrap()
 }
 
@@ -526,47 +530,57 @@ fn the_readme_manifest_example_loads() {
 }
 
 /// The README's stores.yml example declares an https library, which a
-/// page cannot fetch. Read in a library with the declared path beside
-/// it, it lists this library, then `shared` with its skill, then
-/// `upstream`, not yet in the cache.
+/// page cannot fetch. Run as a page, in the same scratch environment as
+/// every other page, with the declared path beside it, it lists this
+/// library, then `shared` with its skill, then `upstream`, not yet in
+/// the cache.
 #[test]
 fn the_readme_stores_example_declares_two_libraries() {
+    if std::env::var_os("TRYCMD").is_some() {
+        return;
+    }
     let readme = std::fs::read_to_string(root().join("README.md")).unwrap();
     let example = fence_after(&readme, "## Composed libraries", "yaml");
     let guard = tempfile::tempdir().unwrap();
     let scratch = guard.path().canonicalize().unwrap();
-    let home = scratch.join("home");
-    let lib = scratch.join("lib");
-    let team = scratch.join("team-skills");
-    for dir in [&home, &lib.join("skills"), &team.join("skills/testing")] {
-        std::fs::create_dir_all(dir).unwrap();
-    }
-    std::fs::write(lib.join("almanac.yml"), "library: skills\n").unwrap();
-    std::fs::write(team.join("almanac.yml"), "library: skills\n").unwrap();
+    let page = scratch.join("readme-stores.md");
     std::fs::write(
-        team.join("skills/testing/SKILL.md"),
-        "---\nname: testing\ndescription: How to test.\n---\n",
+        &page,
+        format!(
+            "```console\n\
+             $ almanac --root team init\n\
+             initialized almanac.yml (library: skills)\n\
+             \n\
+             $ almanac init\n\
+             initialized almanac.yml (library: skills)\n\
+             \n\
+             ```\n\
+             \n\
+             ```markdown {{filename=\"team/skills/testing/SKILL.md\"}}\n\
+             ---\n\
+             name: testing\n\
+             description: How to test.\n\
+             ---\n\
+             ```\n\
+             \n\
+             ```yaml {{filename=\"stores.yml\"}}\n\
+             {example}\
+             ```\n\
+             \n\
+             ```console\n\
+             $ mv team ../team-skills\n\
+             \n\
+             $ almanac store list\n\
+             (this library)  [CWD]  0 skill(s)\n\
+             shared  ../team-skills  1 skill(s)\n\
+             upstream  https://example.com/org/skills  unavailable: \
+             https://example.com/org/skills is not in the cache; run store sync\n\
+             \n\
+             ```\n"
+        ),
     )
     .unwrap();
-    std::fs::write(lib.join("stores.yml"), &example).unwrap();
-    let wrapper = write_almanac_wrapper(&scratch);
-    let out = Command::new(wrapper)
-        .args(["store", "list"])
-        .current_dir(&lib)
-        .env("HOME", &home)
-        .env("XDG_CACHE_HOME", home.join(".cache"))
-        .output()
-        .unwrap();
-    let text = String::from_utf8(out.stdout).unwrap();
-    assert!(out.status.success(), "{text}");
-    let rows: Vec<&str> = text.lines().collect();
-    assert_eq!(rows.len(), 3, "{text}");
-    assert!(rows[0].starts_with("(this library)"), "{text}");
-    assert_eq!(rows[1], "shared  ../team-skills  1 skill(s)", "{text}");
-    assert!(
-        rows[2].starts_with("upstream  https://example.com/org/skills  unavailable"),
-        "{text}"
-    );
+    run_page(&scratch, &page);
 }
 
 /// The harness itself: a page whose output differs from the binary fails,
@@ -760,6 +774,34 @@ fn page_commands_run_in_a_clean_environment() {
     assert!(env.contains("HOME=/page-home\n"), "{env}");
     assert!(!env.contains("GIT_DIR"), "{env}");
     assert!(!env.contains("MDSTORE_REGISTRY"), "{env}");
+}
+
+/// Every page the docs test runs: README.md, and each Markdown file in
+/// docs/, counted here by name rather than by the filter `pages` uses.
+#[test]
+fn pages_cover_readme_and_every_docs_page() {
+    let mut expected: Vec<PathBuf> = std::fs::read_dir(root().join("docs"))
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.to_string_lossy().ends_with(".md"))
+        .collect();
+    expected.sort();
+    assert!(expected.len() >= 4, "{expected:?}");
+    expected.insert(0, root().join("README.md"));
+    assert_eq!(pages(), expected);
+}
+
+/// A `> ` line continues a command, so it may hold a backslash; an
+/// output line may not.
+#[test]
+fn a_continuation_line_may_hold_a_backslash() {
+    let names: Vec<String> = commands(
+        Path::new("p.md"),
+        "```console\n$ almanac show \\\n> writing\nok\n```\n",
+    )
+    .into_iter()
+    .collect();
+    assert_eq!(names, ["almanac"]);
 }
 
 #[test]
