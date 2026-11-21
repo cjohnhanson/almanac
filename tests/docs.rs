@@ -745,6 +745,43 @@ fn a_page_reads_no_machine_user_config() {
          $ cat note.txt\n\
          from the work fixture\n\
          \n\
+         $ almanac --user-config ../home/other.yml store root\n\
+         root_store: unset\n\
+         \n\
+         ```\n",
+    )
+    .unwrap();
+    run_page(&scratch, &page);
+}
+
+/// A page's commands see the page's `HOME` and XDG directories, never
+/// the test process's, whatever the process sets.
+#[test]
+fn a_page_sees_its_own_home_and_xdg_directories() {
+    if std::env::var_os("TRYCMD").is_some() {
+        return;
+    }
+    let guard = tempfile::tempdir().unwrap();
+    let scratch = guard.path().canonicalize().unwrap();
+    let page = scratch.join("page-env.md");
+    std::fs::write(
+        &page,
+        "```console\n\
+         $ printenv HOME\n\
+         [PARENT]/home\n\
+         \n\
+         $ printenv XDG_CONFIG_HOME\n\
+         [PARENT]/home/.config\n\
+         \n\
+         $ printenv XDG_STATE_HOME\n\
+         [PARENT]/home/.local/state\n\
+         \n\
+         $ printenv XDG_DATA_HOME\n\
+         [PARENT]/home/.local/share\n\
+         \n\
+         $ printenv XDG_CACHE_HOME\n\
+         [PARENT]/home/.cache\n\
+         \n\
          ```\n",
     )
     .unwrap();
@@ -797,7 +834,7 @@ fn pages_cover_readme_and_every_docs_page() {
 fn a_continuation_line_may_hold_a_backslash() {
     let names: Vec<String> = commands(
         Path::new("p.md"),
-        "```console\n$ almanac show \\\n> writing\nok\n```\n",
+        "```console\n$ almanac show\n> wri\\ting\nok\n```\n",
     )
     .into_iter()
     .collect();
